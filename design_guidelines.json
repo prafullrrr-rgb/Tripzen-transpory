@@ -1,0 +1,108 @@
+{
+  "project_name": "TripZen",
+  "platform": "hybrid_fullstack (Expo React Native)",
+  "theme": "Light",
+  "archetype": "1 (Organic & Earthy / Trust / Family-friendly)",
+  "design_philosophy": "A premium, safety-first family app. Calm, reassuring, and easy to use. Information-dense for admin but clean. Navy blue provides professional trust and stability, while yellow/amber adds warmth and high visibility for safety elements.",
+  "colors": {
+    "primary": "#0F1B3D",
+    "primary_light": "#1E3370",
+    "accent": "#FCB813",
+    "accent_light": "#FDD15B",
+    "background": "#FFFFFF",
+    "background_secondary": "#F8FAFC",
+    "background_tertiary": "#F1F5F9",
+    "text_primary": "#0F1B3D",
+    "text_secondary": "#64748B",
+    "text_inverse": "#FFFFFF",
+    "success": "#10B981",
+    "success_background": "#D1FAE5",
+    "error": "#EF4444",
+    "error_background": "#FEE2E2",
+    "border": "#E2E8F0"
+  },
+  "typography": {
+    "heading_1": "text-4xl font-bold tracking-tight text-[#0F1B3D]",
+    "heading_2": "text-2xl font-semibold tracking-tight text-[#0F1B3D]",
+    "heading_3": "text-lg font-medium text-[#0F1B3D]",
+    "body": "text-base text-[#64748B]",
+    "body_small": "text-sm text-[#64748B]",
+    "label": "text-xs font-semibold uppercase tracking-wider text-[#64748B]"
+  },
+  "spacing": {
+    "screen_padding": "p-4 md:p-6",
+    "card_padding": "p-4 md:p-5",
+    "section_gap": "gap-6",
+    "item_gap": "gap-3",
+    "border_radius_card": "rounded-2xl",
+    "border_radius_button": "rounded-xl"
+  },
+  "components": {
+    "ScreenContainer": "flex-1 bg-white",
+    "Card": "bg-white rounded-2xl border border-slate-100 p-5 shadow-sm",
+    "PrimaryButton": "bg-[#FCB813] rounded-xl py-3.5 px-6 flex-row justify-center items-center shadow-sm active:bg-[#E5A40F]",
+    "PrimaryButtonText": "text-[#0F1B3D] font-bold text-lg",
+    "SecondaryButton": "bg-[#0F1B3D] rounded-xl py-3.5 px-6 flex-row justify-center items-center shadow-sm active:bg-[#1E3370]",
+    "SecondaryButtonText": "text-white font-bold text-lg",
+    "OutlineButton": "bg-transparent border-2 border-[#0F1B3D] rounded-xl py-3.5 px-6 flex-row justify-center items-center active:bg-slate-50",
+    "OutlineButtonText": "text-[#0F1B3D] font-bold text-lg",
+    "TextInput": "w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-base text-[#0F1B3D]",
+    "TabBar": "bg-white border-t border-slate-100 pb-safe pt-2 px-4 flex-row justify-around items-center h-20",
+    "BadgeSuccess": "bg-[#D1FAE5] px-2.5 py-1 rounded-full",
+    "BadgeSuccessText": "text-[#10B981] text-xs font-bold",
+    "BadgeError": "bg-[#FEE2E2] px-2.5 py-1 rounded-full",
+    "BadgeErrorText": "text-[#EF4444] text-xs font-bold"
+  },
+  "screens": {
+    "auth": {
+      "Login": "Clean white background. Logo centered. Role selection buttons (Parent, Driver, Admin) with distinct icons. 'Sign In' primary button."
+    },
+    "parent_app": {
+      "Home": "Header greeting 'Hello, Priya'. Top half features an embedded Map view showing live bus location. Bottom half features a draggable bottom sheet or stacked cards showing 'Aarav's Trip Status' (ETA, Driver Info, Status Timeline).",
+      "Notifications": "Vertical timeline layout. Entries for 'Bus Arrived', 'Child Checked-in', 'Handover Complete'. Green check icons for success, red X for alerts.",
+      "Profile": "Child profile cards with photo avatars. Settings, trip history, and subscription/payment management (Stripe)."
+    },
+    "driver_app": {
+      "Home": "Clean dashboard showing 'Today's Route: Route 3 - Morning'. List of stops in a timeline graphic. Prominent 'Start Route' primary button.",
+      "ActiveRoute": "Map view for navigation. Floating card showing next stop details. Large 'Scan Child' button anchored at the bottom.",
+      "QRScanner": "Full screen camera view with a scanning overlay. Success/Error modal overlay post-scan with child details."
+    },
+    "admin_dashboard": {
+      "Overview": "Grid of stats cards: Total Routes (12), Total Students (156), Active Buses (8), On Time (92%). Scrollable alerts feed below (e.g., 'Bus 3 Delay').",
+      "LiveMap": "Full screen map visualizing all active buses. Pinch to zoom. Tapping a bus shows a modal with driver, route, and occupancy details.",
+      "Management": "List views for routes, drivers, and students. Use card-based layouts with status badges."
+    }
+  },
+  "testing": {
+    "guidelines": "All interactive and key informational elements MUST include a `data-testid` attribute to facilitate robust automated testing. Example: `data-testid=\"login-parent-button\"`, `data-testid=\"start-route-button\"`."
+  },
+  "media": {
+    "image_urls": {
+      "child_avatars": [
+        {
+          "url": "https://images.unsplash.com/photo-1693639257331-0bad8ac3913f?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1MDV8MHwxfHNlYXJjaHwxfHxjaGlsZCUyMGZhY2UlMjBwb3J0cmFpdCUyMHNtaWxlfGVufDB8fHx8MTc3OTY0NzA5NHww&ixlib=rb-4.1.0&q=85",
+          "description": "Young boy avatar, for student profiles (e.g., Aarav)"
+        },
+        {
+          "url": "https://images.unsplash.com/photo-1718895480108-37c0346792ed?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1MDV8MHwxfHNlYXJjaHwzfHxjaGlsZCUyMGZhY2UlMjBwb3J0cmFpdCUyMHNtaWxlfGVufDB8fHx8MTc3OTY0NzA5NHww&ixlib=rb-4.1.0&q=85",
+          "description": "Young girl avatar, for student profiles"
+        }
+      ],
+      "bus_icons": [
+        {
+          "url": "https://images.unsplash.com/photo-1689973849511-e1995810cf7a?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NTYxODd8MHwxfHNlYXJjaHwxfHx5ZWxsb3clMjBzY2hvb2wlMjBidXMlMjBkcml2aW5nfGVufDB8fHx8MTc3OTY0NzA5NHww&ixlib=rb-4.1.0&q=85",
+          "description": "School buses, use for placeholder backgrounds or decorative elements in Admin app"
+        }
+      ]
+    }
+  },
+  "instructions_to_main_agent": [
+    "This is an Expo React Native application using .js files. Do not use web DOM elements like div, span. Use View, Text, ScrollView, TouchableOpacity from react-native.",
+    "Style the components using NativeWind (Tailwind for React Native) referencing the Tailwind classes provided in the components section.",
+    "Implement a Bottom Tab Navigator for the main app structure for each role.",
+    "Use react-native-maps for the Map views.",
+    "Ensure the color palette accurately reflects the TripZen brand: Navy (#0F1B3D) and Yellow/Amber (#FCB813).",
+    "Add `data-testid` to all interactive elements for end-to-end testing.",
+    "Utilize the provided avatar URLs for placeholder student data."
+  ]
+}
