@@ -31,7 +31,13 @@
           "image": "./assets/images/splash-icon.png",
           "imageWidth": 200,
           "resizeMode": "contain",
-          "backgroundColor": "#000"
+          "backgroundColor": "#0F1B3D"
+        }
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Scan student QR badges for safe boarding."
         }
       ]
     ],
