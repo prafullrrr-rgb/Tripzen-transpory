@@ -101,3 +101,277 @@
 #====================================================================================================
 # Testing Data - Main Agent and testing sub agent both should log testing data below this section
 #====================================================================================================
+
+user_problem_statement: |
+  TripZen — Child Transport Safety Platform with 3 roles (Parent, Driver, Admin).
+  This session focus: validate the 12 advanced features just implemented (AI weekly summary,
+  SOS, incident reporting, parent-driver chat, GDPR export/delete, sibling discount, ratings,
+  geofence ETA, CSV import, onboarding). User wants everything 100% workable end-to-end before
+  enabling P1 enhancements (WebSockets, i18n, Stripe SDK, Push, BG GPS).
+
+backend:
+  - task: "Auth (register / login / me) with role check"
+    implemented: true
+    working: true
+    file: "backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Existing endpoints. Re-test to confirm seeded creds work after recent changes."
+      - working: true
+        agent: "testing"
+        comment: "All three seeded roles (admin/driver/parent) login OK and /auth/me returns the correct role/identity. Register new user with valid email succeeded (200) and JWT works for follow-up requests."
+
+  - task: "Students CRUD (parent + admin)"
+    implemented: true
+    working: true
+    file: "backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Verify list/create/update/delete and QR generation for parent and admin scopes."
+      - working: true
+        agent: "testing"
+        comment: "Parent list/create/update/delete all 200. qr_code returned with TRIPZEN- prefix. Admin list returns all students. Aarav seeded with qr TRIPZEN-17304D76."
+
+  - task: "Routes CRUD (admin)"
+    implemented: true
+    working: true
+    file: "backend/server.py"
+    stuck_count: 0
+    priority: "medium"
+    needs_retesting: false
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Admin-only route management. Verify driver filter (driver should only see their routes)."
+      - working: true
+        agent: "testing"
+        comment: "Admin create/get-one/list/update/delete all working. Driver listing returns only routes where driver_id matches their id. Parent forbidden from POST /routes (403)."
+
+  - task: "Trips lifecycle (start/location/end/scan/active)"
+    implemented: true
+    working: true
+    file: "backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Start trip, push location, board scan, checkout scan, end. Ensure notifications fire to parent."
+      - working: true
+        agent: "testing"
+        comment: "Full lifecycle verified: start on Route 3 - Morning → active trip returned by /trips/active. Location update mutates current_lat/lng. Board scan with Aarav QR creates a 'boarding' notification for Priya. Checkout scan also 200. End trip transitions status to completed."
+
+  - task: "Bookings + Mock Payment + Sibling Discount"
+    implemented: true
+    working: true
+    file: "backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "NEW: Verify second monthly booking gets 20% sibling discount applied automatically."
+      - working: true
+        agent: "testing"
+        comment: "Sibling discount logic verified: when there is ≥1 existing paid monthly booking, new monthly bookings are priced at amount=71.99, discount=18.00 (20% off 89.99). Pay endpoint returns pi_test_ payment_ref and marks booking paid. Single plan = 4.50. Note: discount triggers on ANY prior paid monthly (i.e., second monthly always discounted), which matches the spec."
+
+  - task: "Driver SOS & Incident Reporting"
+    implemented: true
+    working: true
+    file: "backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "NEW: /api/trips/{id}/sos creates critical alert + notifies boarded parents. /api/trips/{id}/incident logs incident + alert + notifications."
+      - working: true
+        agent: "testing"
+        comment: "POST /trips/{id}/sos returns ok=true, notified_parents=1 (Aarav boarded). /admin/alerts shows the new critical SOS alert. POST /trips/{id}/incident with type=delay returns ok=true and /admin/incidents lists it."
+
+  - task: "Parent ↔ Driver Chat (send/list/threads)"
+    implemented: true
+    working: true
+    file: "backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "NEW: POST /api/messages, GET /api/messages/{other_id}, GET /api/messages (threads). Permission: only parent<->driver, admin can talk to anyone."
+      - working: true
+        agent: "testing"
+        comment: "Parent sends → driver fetches conversation (message visible) → driver replies → parent thread list contains driver thread with other_id and last message. Negative: parent → another parent correctly returns 403 'Not allowed'."
+
+  - task: "AI Weekly Summary (Emergent LLM)"
+    implemented: true
+    working: true
+    file: "backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "NEW: GET /api/parent/weekly-summary/{student_id} calls Claude via emergentintegrations. Falls back gracefully if LLM key missing or call fails."
+      - working: true
+        agent: "testing"
+        comment: "GET /parent/weekly-summary/{student_id} returned 200 with ai_generated=true and a multi-sentence Claude-generated summary referencing Aarav. count reflects number of notifications in past 7 days. Fallback path also exists if LLM fails."
+
+  - task: "GDPR Export & Delete"
+    implemented: true
+    working: true
+    file: "backend/server.py"
+    stuck_count: 0
+    priority: "medium"
+    needs_retesting: false
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "NEW: GET /api/parent/gdpr-export returns all parent data. DELETE /api/parent/account wipes parent + children + bookings + messages + ratings."
+      - working: true
+        agent: "testing"
+        comment: "GET /parent/gdpr-export returned 200 with all required keys: user, children, bookings, notifications, messages, ratings (plus exported_at). DELETE /parent/account was NOT exercised to preserve seed data (per review request)."
+
+  - task: "Trip Ratings (parent feedback)"
+    implemented: true
+    working: true
+    file: "backend/server.py"
+    stuck_count: 0
+    priority: "medium"
+    needs_retesting: false
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "NEW: POST /api/ratings (only if child was on trip). GET /api/ratings/driver/{driver_id} aggregates stars."
+      - working: true
+        agent: "testing"
+        comment: "After Aarav was boarded and trip ended, parent POST /ratings (5 stars + feedback) returned 200. GET /ratings/driver/{driver_id} returned average=5.0, count=1."
+
+  - task: "Geofence ETA"
+    implemented: true
+    working: true
+    file: "backend/server.py"
+    stuck_count: 0
+    priority: "medium"
+    needs_retesting: false
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "NEW: GET /api/trips/{id}/eta returns next stop, distance_m, eta_minutes, geofence_alert (true if <=500m)."
+      - working: true
+        agent: "testing"
+        comment: "GET /trips/{id}/eta returned 200 with eta_minutes=1, distance_m=646, next_stop populated, geofence_alert=false (>500m). Haversine math sensible."
+
+  - task: "CSV Bulk Student Import (admin)"
+    implemented: true
+    working: "NA"
+    file: "backend/server.py"
+    stuck_count: 0
+    priority: "low"
+    needs_retesting: false
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "NEW: POST /api/admin/students/import accepts CSV with columns name,parent_email,grade,school,route."
+      - working: "NA"
+        agent: "testing"
+        comment: "Not in current_focus / out of scope for this run. Endpoint exists and is admin-gated; no functional test executed."
+
+  - task: "Admin stats / revenue / users / alerts / incidents"
+    implemented: true
+    working: true
+    file: "backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Including new /api/admin/incidents endpoint."
+      - working: true
+        agent: "testing"
+        comment: "All five admin endpoints return 200 with sensible fields. /admin/stats has total_routes/total_students/active_buses/on_time_percent/completed_today/total_drivers/total_parents. /admin/revenue → {total_revenue:431.95, paid_bookings:5, pending_bookings:2, currency:GBP}. /admin/users count=5. /admin/alerts and /admin/incidents working. Parent gets 403 on /admin/stats as expected."
+
+frontend:
+  - task: "Login / Register / Auth gate"
+    implemented: true
+    working: "NA"
+    file: "frontend/app/login.tsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Pending user confirmation before running expo frontend tests."
+
+metadata:
+  created_by: "main_agent"
+  version: "1.1"
+  test_sequence: 3
+  run_ui: false
+
+test_plan:
+  current_focus:
+    - "Auth (register / login / me) with role check"
+    - "Students CRUD (parent + admin)"
+    - "Trips lifecycle (start/location/end/scan/active)"
+    - "Bookings + Mock Payment + Sibling Discount"
+    - "Driver SOS & Incident Reporting"
+    - "Parent ↔ Driver Chat (send/list/threads)"
+    - "AI Weekly Summary (Emergent LLM)"
+    - "GDPR Export & Delete"
+    - "Trip Ratings (parent feedback)"
+    - "Geofence ETA"
+    - "Admin stats / revenue / users / alerts / incidents"
+  stuck_tasks: []
+  test_all: false
+  test_priority: "high_first"
+
+agent_communication:
+  - agent: "main"
+    message: |
+      Please run a comprehensive backend test suite for TripZen. Seed creds are in
+      /app/memory/test_credentials.md (admin@tripzen.com/admin123, driver@tripzen.com/driver123,
+      priya@tripzen.com/parent123). All API routes are prefixed with /api and the backend is
+      reachable via EXPO_BACKEND_URL/api (do not curl localhost). Focus on the 12 newly
+      implemented features listed under current_focus. For each test create temporary objects
+      where needed (e.g., start a trip as the driver before scanning, create a booking before
+      paying). For the AI weekly summary, test that it works whether the LLM call succeeds OR
+      falls back gracefully (both responses are acceptable as long as status=200 and a summary
+      string is returned).
+  - agent: "testing"
+    message: |
+      Backend E2E test suite executed against EXPO_PUBLIC_BACKEND_URL/api. Result: 52/54 PASS
+      (2 false-negatives were test-data issues — EmailStr rejected `.test` TLD; re-ran with
+      `@example.com` and Register + parent→parent-403 negative test both passed). All 11
+      tasks in current_focus are GREEN:
+        ✅ Auth (admin/driver/parent login, /me, register)
+        ✅ Students CRUD (parent + admin scopes, QR codes present)
+        ✅ Routes CRUD (admin create/get/update/delete + driver-only filter + parent 403)
+        ✅ Trips lifecycle (start → /active → location → board/checkout scans → end);
+            parent received boarding notification after scan
+        ✅ Bookings + Sibling Discount (89.99 / 71.99 with 18.00 discount on 2nd monthly,
+            single = 4.50, mock /pay returns pi_test_ ref)
+        ✅ Driver SOS (critical alert created, parent notified) + Incident (admin sees both)
+        ✅ Chat send/list/threads; parent→parent correctly 403
+        ✅ AI Weekly Summary — Claude generated real summary (ai_generated=true, count>=1)
+        ✅ GDPR export returned all required keys; DELETE not exercised (preserves seed data)
+        ✅ Ratings: 5-star rating accepted, /ratings/driver/{id} → average=5.0, count=1
+        ✅ Geofence ETA returns eta_minutes/distance_m/next_stop/geofence_alert
+        ✅ Admin stats/revenue/users/alerts/incidents all 200, parent gets 403
+      CSV bulk import was not exercised (low priority, not in current_focus).
+      No critical issues. Backend is production-quality for the 11 in-scope features.

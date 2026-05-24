@@ -1,5 +1,8 @@
 """TripZen Backend - Child Transport Safety Platform"""
 import os
+import io
+import csv
+import math
 import uuid
 import logging
 import random
@@ -7,7 +10,7 @@ from pathlib import Path
 from datetime import datetime, timezone, timedelta
 from typing import List, Optional, Literal
 
-from fastapi import FastAPI, APIRouter, HTTPException, Depends, status
+from fastapi import FastAPI, APIRouter, HTTPException, Depends, status, UploadFile, File
 from fastapi.security import OAuth2PasswordBearer
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
@@ -23,6 +26,7 @@ load_dotenv(ROOT_DIR / ".env")
 MONGO_URL = os.environ["MONGO_URL"]
 DB_NAME = os.environ.get("DB_NAME", "tripzen_db")
 JWT_SECRET = os.environ.get("JWT_SECRET", "tripzen-supersecret-change-in-prod")
+EMERGENT_LLM_KEY = os.environ.get("EMERGENT_LLM_KEY", "")
 JWT_ALGO = "HS256"
 ACCESS_TOKEN_EXPIRE_HOURS = 24 * 7
 
@@ -535,13 +539,26 @@ PRICE_MAP = {"monthly": 89.99, "single": 4.50}
 @api.post("/bookings")
 async def create_booking(body: BookingCreate, user: dict = Depends(require_roles("parent"))):
     bid = str(uuid.uuid4())
+    base = PRICE_MAP.get(body.plan, 89.99)
+    # Sibling discount: 20% off each additional active monthly booking for same parent
+    existing_paid = await db.bookings.count_documents({
+        "parent_id": user["id"],
+        "status": "paid",
+        "plan": "monthly",
+    })
+    discount = 0.0
+    if body.plan == "monthly" and existing_paid >= 1:
+        discount = round(base * 0.20, 2)
+    amount = round(base - discount, 2)
     doc = {
         "id": bid,
         "parent_id": user["id"],
         "student_id": body.student_id,
         "route_id": body.route_id,
         "plan": body.plan,
-        "amount": PRICE_MAP.get(body.plan, 89.99),
+        "amount": amount,
+        "base_amount": base,
+        "discount": discount,
         "currency": "GBP",
         "status": "pending",
         "created_at": now_iso(),
@@ -655,6 +672,386 @@ async def admin_revenue(user: dict = Depends(require_roles("admin"))):
         "pending_bookings": pending,
         "currency": "GBP",
     }
+
+
+# ----- Emergency SOS & Incidents -----
+class IncidentCreate(BaseModel):
+    type: Literal["delay", "breakdown", "traffic", "behavior", "other"]
+    description: str
+
+
+@api.post("/trips/{trip_id}/sos")
+async def trigger_sos(trip_id: str, user: dict = Depends(require_roles("driver"))):
+    trip = await db.trips.find_one({"id": trip_id, "driver_id": user["id"]}, {"_id": 0})
+    if not trip:
+        raise HTTPException(404, "Trip not found")
+    # Critical alert to admin
+    alert_doc = {
+        "id": str(uuid.uuid4()),
+        "type": "sos",
+        "title": f"🚨 EMERGENCY SOS — {trip['route_name']}",
+        "message": f"Driver triggered SOS. Location: {trip['current_lat']:.4f}, {trip['current_lng']:.4f}",
+        "severity": "critical",
+        "created_at": now_iso(),
+        "related_trip_id": trip_id,
+    }
+    await db.alerts.insert_one(alert_doc)
+    # Notify every parent whose child is boarded
+    boarded = trip.get("boarded_student_ids", [])
+    if boarded:
+        students = await db.students.find({"id": {"$in": boarded}}, {"_id": 0}).to_list(100)
+        for s in students:
+            await _create_notification(
+                s["parent_id"], s["id"], "alert",
+                f"⚠️ Bus emergency — {s['name']}",
+                "Driver has signaled an emergency. Help is being dispatched. Stay calm.",
+                icon="warning",
+            )
+    return {"ok": True, "alert_id": alert_doc["id"], "notified_parents": len(boarded)}
+
+
+@api.post("/trips/{trip_id}/incident")
+async def report_incident(trip_id: str, body: IncidentCreate, user: dict = Depends(require_roles("driver"))):
+    trip = await db.trips.find_one({"id": trip_id, "driver_id": user["id"]}, {"_id": 0})
+    if not trip:
+        raise HTTPException(404, "Trip not found")
+    incident_id = str(uuid.uuid4())
+    doc = {
+        "id": incident_id,
+        "trip_id": trip_id,
+        "driver_id": user["id"],
+        "type": body.type,
+        "description": body.description,
+        "created_at": now_iso(),
+    }
+    await db.incidents.insert_one(doc)
+    severity = "critical" if body.type == "breakdown" else "warning"
+    await db.alerts.insert_one({
+        "id": str(uuid.uuid4()),
+        "type": "incident",
+        "title": f"Incident — {body.type.title()} on {trip['route_name']}",
+        "message": body.description[:200],
+        "severity": severity,
+        "created_at": now_iso(),
+        "related_trip_id": trip_id,
+    })
+    # Notify all boarded parents
+    boarded = trip.get("boarded_student_ids", [])
+    if boarded:
+        students = await db.students.find({"id": {"$in": boarded}}, {"_id": 0}).to_list(100)
+        for s in students:
+            await _create_notification(
+                s["parent_id"], s["id"], "delay",
+                f"Bus update — {s['name']}",
+                f"{body.type.title()}: {body.description[:120]}",
+                icon="alert-circle",
+            )
+    return {"ok": True, "incident_id": incident_id}
+
+
+@api.get("/admin/incidents")
+async def list_incidents(user: dict = Depends(require_roles("admin"))):
+    cursor = db.incidents.find({}, {"_id": 0}).sort("created_at", -1).limit(100)
+    return await cursor.to_list(100)
+
+
+# ----- Trip Ratings -----
+class RatingCreate(BaseModel):
+    trip_id: str
+    stars: int = Field(ge=1, le=5)
+    feedback: Optional[str] = None
+
+
+@api.post("/ratings")
+async def create_rating(body: RatingCreate, user: dict = Depends(require_roles("parent"))):
+    trip = await db.trips.find_one({"id": body.trip_id}, {"_id": 0})
+    if not trip:
+        raise HTTPException(404, "Trip not found")
+    # Ensure this parent's child was on the trip
+    children = await db.students.find({"parent_id": user["id"]}, {"_id": 0}).to_list(100)
+    child_ids = {c["id"] for c in children}
+    if not (set(trip.get("boarded_student_ids", [])) & child_ids):
+        raise HTTPException(403, "Your child was not on this trip")
+    rid = str(uuid.uuid4())
+    doc = {
+        "id": rid,
+        "trip_id": body.trip_id,
+        "driver_id": trip["driver_id"],
+        "parent_id": user["id"],
+        "stars": body.stars,
+        "feedback": body.feedback,
+        "created_at": now_iso(),
+    }
+    await db.ratings.insert_one(doc)
+    return {k: v for k, v in doc.items() if k != "_id"}
+
+
+@api.get("/ratings/driver/{driver_id}")
+async def driver_ratings(driver_id: str, user: dict = Depends(get_current_user)):
+    cursor = db.ratings.find({"driver_id": driver_id}, {"_id": 0}).sort("created_at", -1)
+    ratings = await cursor.to_list(100)
+    if not ratings:
+        return {"average": 0, "count": 0, "ratings": []}
+    avg = sum(r["stars"] for r in ratings) / len(ratings)
+    return {"average": round(avg, 2), "count": len(ratings), "ratings": ratings}
+
+
+# ----- Parent <-> Driver Chat -----
+class MessageCreate(BaseModel):
+    recipient_id: str
+    text: str
+
+
+@api.post("/messages")
+async def send_message(body: MessageCreate, user: dict = Depends(get_current_user)):
+    recipient = await db.users.find_one({"id": body.recipient_id}, {"_id": 0})
+    if not recipient:
+        raise HTTPException(404, "Recipient not found")
+    # Only parent <-> driver allowed (admin can talk to anyone)
+    allowed = (
+        user["role"] == "admin"
+        or recipient["role"] == "admin"
+        or {user["role"], recipient["role"]} == {"parent", "driver"}
+    )
+    if not allowed:
+        raise HTTPException(403, "Not allowed")
+    mid = str(uuid.uuid4())
+    doc = {
+        "id": mid,
+        "from_id": user["id"],
+        "to_id": body.recipient_id,
+        "text": body.text[:1000],
+        "created_at": now_iso(),
+        "read": False,
+    }
+    await db.messages.insert_one(doc)
+    return {k: v for k, v in doc.items() if k != "_id"}
+
+
+@api.get("/messages/{other_id}")
+async def get_messages(other_id: str, user: dict = Depends(get_current_user)):
+    cursor = db.messages.find(
+        {
+            "$or": [
+                {"from_id": user["id"], "to_id": other_id},
+                {"from_id": other_id, "to_id": user["id"]},
+            ]
+        },
+        {"_id": 0},
+    ).sort("created_at", 1)
+    msgs = await cursor.to_list(500)
+    # Mark received as read
+    await db.messages.update_many(
+        {"from_id": other_id, "to_id": user["id"], "read": False},
+        {"$set": {"read": True}},
+    )
+    return msgs
+
+
+@api.get("/messages")
+async def list_threads(user: dict = Depends(get_current_user)):
+    """Return list of conversation partners with last message."""
+    pipeline = [
+        {"$match": {"$or": [{"from_id": user["id"]}, {"to_id": user["id"]}]}},
+        {"$sort": {"created_at": -1}},
+        {
+            "$group": {
+                "_id": {
+                    "$cond": [{"$eq": ["$from_id", user["id"]]}, "$to_id", "$from_id"],
+                },
+                "last_text": {"$first": "$text"},
+                "last_at": {"$first": "$created_at"},
+                "unread": {
+                    "$sum": {
+                        "$cond": [
+                            {"$and": [{"$eq": ["$to_id", user["id"]]}, {"$eq": ["$read", False]}]},
+                            1,
+                            0,
+                        ]
+                    }
+                },
+            }
+        },
+    ]
+    threads = await db.messages.aggregate(pipeline).to_list(100)
+    # Enrich with user info
+    for t in threads:
+        u = await db.users.find_one({"id": t["_id"]}, {"_id": 0, "password_hash": 0})
+        if u:
+            t["user"] = u
+        t["other_id"] = t.pop("_id")
+    return threads
+
+
+# ----- CSV Bulk Import (Students) -----
+@api.post("/admin/students/import")
+async def import_students(file: UploadFile = File(...), user: dict = Depends(require_roles("admin"))):
+    contents = await file.read()
+    text = contents.decode("utf-8", errors="ignore")
+    reader = csv.DictReader(io.StringIO(text))
+    created = 0
+    errors: List[str] = []
+    parents_by_email: dict = {}
+    routes_by_name: dict = {}
+    async for p in db.users.find({"role": "parent"}, {"_id": 0}):
+        parents_by_email[p["email"].lower()] = p["id"]
+    async for r in db.routes.find({}, {"_id": 0}):
+        routes_by_name[r["name"].lower()] = r["id"]
+    for i, row in enumerate(reader, start=2):
+        try:
+            name = (row.get("name") or "").strip()
+            if not name:
+                errors.append(f"Row {i}: missing name")
+                continue
+            parent_email = (row.get("parent_email") or "").strip().lower()
+            parent_id = parents_by_email.get(parent_email) if parent_email else (await _get_first_parent_id())
+            if not parent_id:
+                errors.append(f"Row {i}: parent {parent_email} not found")
+                continue
+            route_name = (row.get("route") or "").strip().lower()
+            route_id = routes_by_name.get(route_name)
+            sid = str(uuid.uuid4())
+            await db.students.insert_one({
+                "id": sid,
+                "parent_id": parent_id,
+                "name": name,
+                "grade": (row.get("grade") or "").strip() or None,
+                "school": (row.get("school") or "").strip() or None,
+                "avatar_url": None,
+                "route_id": route_id,
+                "qr_code": f"TRIPZEN-{sid[:8].upper()}",
+                "created_at": now_iso(),
+            })
+            if route_id:
+                await db.routes.update_one({"id": route_id}, {"$inc": {"student_count": 1}})
+            created += 1
+        except Exception as e:
+            errors.append(f"Row {i}: {e}")
+    return {"created": created, "errors": errors}
+
+
+# ----- GDPR Data Export -----
+@api.get("/parent/gdpr-export")
+async def gdpr_export(user: dict = Depends(require_roles("parent"))):
+    """Return all data linked to this parent for GDPR Subject Access Request."""
+    students = await db.students.find({"parent_id": user["id"]}, {"_id": 0}).to_list(100)
+    student_ids = [s["id"] for s in students]
+    bookings = await db.bookings.find({"parent_id": user["id"]}, {"_id": 0}).to_list(500)
+    notifications = await db.notifications.find({"user_id": user["id"]}, {"_id": 0}).to_list(500)
+    messages = await db.messages.find(
+        {"$or": [{"from_id": user["id"]}, {"to_id": user["id"]}]}, {"_id": 0}
+    ).to_list(500)
+    ratings = await db.ratings.find({"parent_id": user["id"]}, {"_id": 0}).to_list(500)
+    return {
+        "exported_at": now_iso(),
+        "user": {k: user.get(k) for k in ["id", "email", "full_name", "role", "phone"]},
+        "children": students,
+        "bookings": bookings,
+        "notifications": notifications,
+        "messages": messages,
+        "ratings": ratings,
+    }
+
+
+@api.delete("/parent/account")
+async def gdpr_delete_account(user: dict = Depends(require_roles("parent"))):
+    """GDPR right to be forgotten - delete parent account and all associated data."""
+    students = await db.students.find({"parent_id": user["id"]}, {"_id": 0}).to_list(100)
+    for s in students:
+        if s.get("route_id"):
+            await db.routes.update_one({"id": s["route_id"]}, {"$inc": {"student_count": -1}})
+    await db.students.delete_many({"parent_id": user["id"]})
+    await db.bookings.delete_many({"parent_id": user["id"]})
+    await db.notifications.delete_many({"user_id": user["id"]})
+    await db.messages.delete_many({"$or": [{"from_id": user["id"]}, {"to_id": user["id"]}]})
+    await db.ratings.delete_many({"parent_id": user["id"]})
+    await db.users.delete_one({"id": user["id"]})
+    return {"ok": True, "deleted_at": now_iso()}
+
+
+# ----- Smart ETA & Geofencing helpers -----
+def _haversine_m(lat1: float, lng1: float, lat2: float, lng2: float) -> float:
+    R = 6371000
+    phi1, phi2 = math.radians(lat1), math.radians(lat2)
+    d_phi = math.radians(lat2 - lat1)
+    d_lng = math.radians(lng2 - lng1)
+    a = math.sin(d_phi / 2) ** 2 + math.cos(phi1) * math.cos(phi2) * math.sin(d_lng / 2) ** 2
+    return 2 * R * math.asin(math.sqrt(a))
+
+
+@api.get("/trips/{trip_id}/eta")
+async def trip_eta(trip_id: str, user: dict = Depends(get_current_user)):
+    trip = await db.trips.find_one({"id": trip_id}, {"_id": 0})
+    if not trip:
+        raise HTTPException(404, "Trip not found")
+    route = await db.routes.find_one({"id": trip["route_id"]}, {"_id": 0})
+    if not route or not route.get("stops"):
+        return {"eta_minutes": None, "distance_m": 0, "next_stop": None, "geofence_alert": False}
+    next_idx = min(trip["current_stop_index"] + 1, len(route["stops"]) - 1)
+    next_stop = route["stops"][next_idx]
+    dist = _haversine_m(trip["current_lat"], trip["current_lng"], next_stop["lat"], next_stop["lng"])
+    # assume 30 km/h average urban speed = 500 m/min
+    eta_min = max(1, round(dist / 500))
+    geofence = dist <= 500
+    return {
+        "eta_minutes": eta_min,
+        "distance_m": round(dist),
+        "next_stop": next_stop,
+        "geofence_alert": geofence,
+    }
+
+
+# ----- AI Weekly Summary -----
+@api.get("/parent/weekly-summary/{student_id}")
+async def weekly_summary(student_id: str, user: dict = Depends(require_roles("parent"))):
+    student = await db.students.find_one({"id": student_id, "parent_id": user["id"]}, {"_id": 0})
+    if not student:
+        raise HTTPException(404, "Student not found")
+    week_ago = (now_utc() - timedelta(days=7)).isoformat()
+    notifs = await db.notifications.find(
+        {"user_id": user["id"], "student_id": student_id, "created_at": {"$gte": week_ago}},
+        {"_id": 0},
+    ).to_list(200)
+    if not notifs:
+        return {
+            "summary": f"No trips recorded for {student['name']} in the past week.",
+            "count": 0,
+            "ai_generated": False,
+        }
+    # Build context
+    events = [f"{n['created_at'][:10]} {n['type']}: {n['title']}" for n in notifs[:50]]
+    if not EMERGENT_LLM_KEY:
+        return {
+            "summary": f"{student['name']} had {len(notifs)} events this week, including boardings, arrivals and updates.",
+            "count": len(notifs),
+            "ai_generated": False,
+        }
+    try:
+        from emergentintegrations.llm.chat import LlmChat, UserMessage
+        chat = LlmChat(
+            api_key=EMERGENT_LLM_KEY,
+            session_id=f"weekly-{student_id}",
+            system_message=(
+                "You are TripZen, a friendly child-transport assistant. Generate a warm, reassuring "
+                "weekly summary for a parent about their child's school bus trips. Keep it to 3-4 short "
+                "sentences. Mention any delays or issues honestly but reassuringly. End on a positive note."
+            ),
+        ).with_model("anthropic", "claude-sonnet-4-5-20250929")
+        prompt = (
+            f"Child: {student['name']} ({student.get('grade','')}, {student.get('school','')})\n"
+            f"Events this week:\n" + "\n".join(events) +
+            "\n\nWrite the parent summary now."
+        )
+        response = await chat.send_message(UserMessage(text=prompt))
+        return {"summary": response.strip(), "count": len(notifs), "ai_generated": True}
+    except Exception as e:
+        logger.exception("weekly-summary LLM failed: %s", e)
+        return {
+            "summary": f"{student['name']} had {len(notifs)} events this week.",
+            "count": len(notifs),
+            "ai_generated": False,
+            "error": str(e)[:200],
+        }
 
 
 # ----- Health -----

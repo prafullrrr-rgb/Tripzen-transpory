@@ -8,6 +8,10 @@ import {
   Alert,
   ActivityIndicator,
   Switch,
+  Modal,
+  TextInput,
+  KeyboardAvoidingView,
+  Platform,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -45,6 +49,10 @@ export default function DriverHome() {
   const [loading, setLoading] = useState(true);
   const [starting, setStarting] = useState(false);
   const [simulate, setSimulate] = useState(false);
+  const [incidentOpen, setIncidentOpen] = useState(false);
+  const [incidentType, setIncidentType] = useState<"delay" | "breakdown" | "traffic" | "behavior" | "other">("delay");
+  const [incidentDesc, setIncidentDesc] = useState("");
+  const [incidentSubmitting, setIncidentSubmitting] = useState(false);
   const simulateRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const load = useCallback(async () => {
@@ -134,6 +142,56 @@ export default function DriverHome() {
     ]);
   };
 
+  const triggerSOS = () => {
+    if (!activeTrip) return;
+    const doFire = async () => {
+      try {
+        const res = await api.post<{ ok: boolean; notified_parents: number }>(
+          `/trips/${activeTrip.id}/sos`,
+        );
+        Alert.alert(
+          "🚨 SOS Triggered",
+          `Admin alerted. ${res.notified_parents} parents notified. Stay safe.`,
+        );
+      } catch (e: any) {
+        Alert.alert("SOS failed", e.message);
+      }
+    };
+    if (Platform.OS === "web") {
+      doFire();
+      return;
+    }
+    Alert.alert(
+      "Trigger Emergency SOS?",
+      "Admin and all parents on this bus will be notified immediately.",
+      [
+        { text: "Cancel", style: "cancel" },
+        { text: "Send SOS", style: "destructive", onPress: doFire },
+      ],
+    );
+  };
+
+  const submitIncident = async () => {
+    if (!activeTrip || !incidentDesc.trim()) {
+      Alert.alert("Missing", "Please describe the issue");
+      return;
+    }
+    setIncidentSubmitting(true);
+    try {
+      await api.post(`/trips/${activeTrip.id}/incident`, {
+        type: incidentType,
+        description: incidentDesc.trim(),
+      });
+      setIncidentOpen(false);
+      setIncidentDesc("");
+      Alert.alert("Reported", "Incident logged. Admin and parents notified.");
+    } catch (e: any) {
+      Alert.alert("Failed", e.message);
+    } finally {
+      setIncidentSubmitting(false);
+    }
+  };
+
   if (loading) {
     return (
       <SafeAreaView style={styles.safe}>
@@ -185,6 +243,28 @@ export default function DriverHome() {
                 trackColor={{ false: COLORS.border, true: COLORS.accent }}
                 thumbColor={COLORS.bg}
               />
+            </View>
+
+            {/* Safety actions */}
+            <View style={styles.safetyRow}>
+              <TouchableOpacity
+                testID="sos-btn"
+                style={styles.sosBtn}
+                onPress={triggerSOS}
+                activeOpacity={0.85}
+              >
+                <Ionicons name="warning" size={20} color="#fff" />
+                <Text style={styles.sosText}>SOS</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                testID="incident-btn"
+                style={styles.incidentBtn}
+                onPress={() => setIncidentOpen(true)}
+                activeOpacity={0.85}
+              >
+                <Ionicons name="alert-circle" size={18} color={COLORS.warning} />
+                <Text style={styles.incidentText}>Report Issue</Text>
+              </TouchableOpacity>
             </View>
 
             {/* Stops timeline */}
@@ -278,6 +358,64 @@ export default function DriverHome() {
           </>
         )}
       </ScrollView>
+
+      {/* Incident report modal */}
+      <Modal visible={incidentOpen} animationType="slide" transparent onRequestClose={() => setIncidentOpen(false)}>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : undefined}
+          style={styles.modalOverlay}
+        >
+          <View style={styles.modal}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Report Issue</Text>
+              <TouchableOpacity onPress={() => setIncidentOpen(false)} testID="close-incident-modal">
+                <Ionicons name="close" size={24} color={COLORS.primary} />
+              </TouchableOpacity>
+            </View>
+            <ScrollView contentContainerStyle={{ padding: SPACING.lg }}>
+              <Text style={styles.label}>Type</Text>
+              <View style={styles.typeGrid}>
+                {(["delay", "breakdown", "traffic", "behavior", "other"] as const).map((t) => (
+                  <TouchableOpacity
+                    key={t}
+                    testID={`incident-type-${t}`}
+                    style={[styles.typeBtn, incidentType === t && styles.typeBtnActive]}
+                    onPress={() => setIncidentType(t)}
+                  >
+                    <Text
+                      style={[styles.typeText, incidentType === t && { color: COLORS.primary, fontWeight: "800" }]}
+                    >
+                      {t}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+              <Text style={styles.label}>Description</Text>
+              <TextInput
+                testID="incident-desc-input"
+                style={[styles.input, { height: 120, textAlignVertical: "top" }]}
+                value={incidentDesc}
+                onChangeText={setIncidentDesc}
+                placeholder="Describe what happened…"
+                placeholderTextColor={COLORS.textSecondary}
+                multiline
+              />
+              <TouchableOpacity
+                testID="submit-incident-btn"
+                style={[styles.submitBtn, incidentSubmitting && { opacity: 0.7 }]}
+                onPress={submitIncident}
+                disabled={incidentSubmitting}
+              >
+                {incidentSubmitting ? (
+                  <ActivityIndicator color={COLORS.primary} />
+                ) : (
+                  <Text style={styles.submitBtnText}>Submit Report</Text>
+                )}
+              </TouchableOpacity>
+            </ScrollView>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -391,4 +529,79 @@ const styles = StyleSheet.create({
   startBtnText: { color: COLORS.primary, fontWeight: "800", fontSize: 13 },
   empty: { alignItems: "center", marginTop: 60 },
   emptyText: { color: COLORS.textSecondary, marginTop: SPACING.sm },
+  safetyRow: { flexDirection: "row", gap: SPACING.sm, marginTop: SPACING.md },
+  sosBtn: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    backgroundColor: COLORS.error,
+    paddingVertical: 14,
+    borderRadius: RADIUS.md,
+  },
+  sosText: { color: "#fff", fontWeight: "800", fontSize: 15, letterSpacing: 0.5 },
+  incidentBtn: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    backgroundColor: COLORS.warningBg,
+    paddingVertical: 14,
+    borderRadius: RADIUS.md,
+    borderWidth: 1.5,
+    borderColor: COLORS.warning,
+  },
+  incidentText: { color: COLORS.warning, fontWeight: "800", fontSize: 13 },
+  modalOverlay: { flex: 1, backgroundColor: "rgba(15, 27, 61, 0.5)", justifyContent: "flex-end" },
+  modal: { backgroundColor: COLORS.bg, borderTopLeftRadius: 24, borderTopRightRadius: 24, maxHeight: "92%" },
+  modalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    padding: SPACING.md,
+    paddingHorizontal: SPACING.lg,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
+  },
+  modalTitle: { fontSize: 18, fontWeight: "800", color: COLORS.primary },
+  label: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: COLORS.textSecondary,
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+    marginTop: SPACING.md,
+    marginBottom: 6,
+  },
+  typeGrid: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
+  typeBtn: {
+    paddingHorizontal: SPACING.md,
+    paddingVertical: 10,
+    backgroundColor: COLORS.bgSecondary,
+    borderRadius: 999,
+    borderWidth: 1.5,
+    borderColor: COLORS.border,
+  },
+  typeBtnActive: { borderColor: COLORS.accent, backgroundColor: COLORS.accentLight },
+  typeText: { fontSize: 12, color: COLORS.textSecondary, fontWeight: "600", textTransform: "capitalize" },
+  input: {
+    backgroundColor: COLORS.bgSecondary,
+    borderRadius: RADIUS.md,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: 14,
+    fontSize: 15,
+    color: COLORS.textPrimary,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  submitBtn: {
+    marginTop: SPACING.lg,
+    backgroundColor: COLORS.accent,
+    paddingVertical: 16,
+    borderRadius: RADIUS.md,
+    alignItems: "center",
+  },
+  submitBtnText: { color: COLORS.primary, fontWeight: "800", fontSize: 15 },
 });

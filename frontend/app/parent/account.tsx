@@ -40,6 +40,23 @@ export default function ParentAccount() {
         <MenuItem icon="language" label="Language" right="English" testID="menu-language" />
         <MenuItem icon="shield-checkmark" label="Privacy & Security" testID="menu-privacy" />
 
+        <Text style={styles.sectionTitle}>Privacy & Data</Text>
+        <MenuItem
+          icon="download"
+          label="Export My Data (GDPR)"
+          testID="menu-gdpr-export"
+          onPress={async () => {
+            try {
+              const data = await api.get<any>("/parent/gdpr-export");
+              const summary = `Export ready!\n\nChildren: ${data.children.length}\nBookings: ${data.bookings.length}\nNotifications: ${data.notifications.length}\nMessages: ${data.messages.length}\nRatings: ${data.ratings.length}\n\nExported: ${new Date(data.exported_at).toLocaleString()}`;
+              Alert.alert("GDPR Export", summary);
+            } catch (e: any) {
+              Alert.alert("Failed", e.message);
+            }
+          }}
+        />
+        <MenuItem icon="shield-checkmark" label="Privacy & Security" testID="menu-privacy" />
+
         <Text style={styles.sectionTitle}>Support</Text>
         <MenuItem icon="help-circle" label="Help Center" testID="menu-help" />
         <MenuItem icon="call" label="24/7 Support" testID="menu-support" />
@@ -61,9 +78,9 @@ export default function ParentAccount() {
   );
 }
 
-function MenuItem({ icon, label, right, testID }: { icon: string; label: string; right?: string; testID?: string }) {
+function MenuItem({ icon, label, right, testID, onPress }: { icon: string; label: string; right?: string; testID?: string; onPress?: () => void }) {
   return (
-    <TouchableOpacity testID={testID} style={styles.menuItem} activeOpacity={0.7}>
+    <TouchableOpacity testID={testID} style={styles.menuItem} activeOpacity={0.7} onPress={onPress}>
       <View style={styles.menuIcon}>
         <Ionicons name={icon as any} size={18} color={COLORS.primary} />
       </View>
