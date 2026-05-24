@@ -1,0 +1,55 @@
+{
+  "cli": {
+    "version": ">= 13.0.0",
+    "appVersionSource": "remote"
+  },
+  "build": {
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal",
+      "channel": "development",
+      "env": {
+        "EXPO_PUBLIC_BACKEND_URL": "https://app-builder-demo-60.preview.emergentagent.com",
+        "EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY": ""
+      },
+      "ios": {
+        "simulator": true
+      },
+      "android": {
+        "buildType": "apk"
+      }
+    },
+    "preview": {
+      "distribution": "internal",
+      "channel": "preview",
+      "env": {
+        "EXPO_PUBLIC_BACKEND_URL": "https://app-builder-demo-60.preview.emergentagent.com",
+        "EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY": ""
+      },
+      "ios": {
+        "simulator": false
+      },
+      "android": {
+        "buildType": "apk"
+      }
+    },
+    "production": {
+      "distribution": "store",
+      "channel": "production",
+      "autoIncrement": true,
+      "env": {
+        "EXPO_PUBLIC_BACKEND_URL": "https://app-builder-demo-60.preview.emergentagent.com",
+        "EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY": ""
+      },
+      "ios": {
+        "simulator": false
+      },
+      "android": {
+        "buildType": "app-bundle"
+      }
+    }
+  },
+  "submit": {
+    "production": {}
+  }
+}
