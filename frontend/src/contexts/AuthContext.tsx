@@ -48,6 +48,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     bootstrap();
   }, [bootstrap]);
 
+  // Once we have a user, register for push notifications (no-op on web/Expo Go).
+  useEffect(() => {
+    if (user) {
+      registerForPushAsync().catch(() => null);
+    }
+  }, [user]);
+
   const signIn = async (email: string, password: string) => {
     const res = await api.post<{ access_token: string; user: User }>(
       "/auth/login",

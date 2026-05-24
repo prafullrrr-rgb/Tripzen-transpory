@@ -7,12 +7,15 @@ import {
   TouchableOpacity,
   Alert,
   ActivityIndicator,
+  Platform,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter, Stack } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
+import { useTranslation } from "react-i18next";
 import { api } from "@/src/api/client";
 import { COLORS, SPACING, RADIUS } from "@/src/constants/theme";
+import { useStripe } from "@/src/utils/stripe";
 
 type Student = { id: string; name: string; school?: string; route_id?: string };
 type Route = { id: string; name: string; bus_number?: string };
@@ -24,6 +27,8 @@ const PLANS = [
 
 export default function Booking() {
   const router = useRouter();
+  const { t } = useTranslation();
+  const stripeHooks = useStripe();
   const [students, setStudents] = useState<Student[]>([]);
   const [routes, setRoutes] = useState<Route[]>([]);
   const [studentId, setStudentId] = useState<string>("");
@@ -31,16 +36,22 @@ export default function Booking() {
   const [plan, setPlan] = useState<"monthly" | "single">("monthly");
   const [loading, setLoading] = useState(true);
   const [paying, setPaying] = useState(false);
+  const [paidMonthlyCount, setPaidMonthlyCount] = useState(0);
 
   useEffect(() => {
     (async () => {
       try {
-        const [s, r] = await Promise.all([api.get<Student[]>("/students"), api.get<Route[]>("/routes")]);
+        const [s, r, b] = await Promise.all([
+          api.get<Student[]>("/students"),
+          api.get<Route[]>("/routes"),
+          api.get<any[]>("/bookings").catch(() => []),
+        ]);
         setStudents(s);
         setRoutes(r);
         if (s[0]) setStudentId(s[0].id);
         if (s[0]?.route_id) setRouteId(s[0].route_id);
         else if (r[0]) setRouteId(r[0].id);
+        setPaidMonthlyCount(b.filter((x) => x.status === "paid" && x.plan === "monthly").length);
       } catch (e: any) {
         Alert.alert("Error", e.message || "Failed to load");
       } finally {
@@ -56,18 +67,65 @@ export default function Booking() {
     }
     setPaying(true);
     try {
-      const booking = await api.post<{ id: string }>("/bookings", {
+      // Step 1: create booking on backend
+      const booking = await api.post<{ id: string; amount: number }>("/bookings", {
         student_id: studentId,
         route_id: routeId,
         plan,
       });
-      // Mock Stripe pay flow
+
+      // Step 2: try native Stripe PaymentSheet (only if SDK + key present)
+      const initPaymentSheet = stripeHooks?.initPaymentSheet;
+      const presentPaymentSheet = stripeHooks?.presentPaymentSheet;
+      const useRealStripe =
+        Platform.OS !== "web" &&
+        initPaymentSheet &&
+        presentPaymentSheet &&
+        !!process.env.EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY;
+
+      if (useRealStripe) {
+        try {
+          const pi = await api.post<{ client_secret: string; publishable_key: string; mocked: boolean }>(
+            `/bookings/${booking.id}/payment-intent`,
+          );
+          if (!pi.mocked) {
+            const initRes = await initPaymentSheet({
+              merchantDisplayName: "TripZen",
+              paymentIntentClientSecret: pi.client_secret,
+              defaultBillingDetails: undefined,
+              allowsDelayedPaymentMethods: false,
+            });
+            if (initRes?.error) throw new Error(initRes.error.message);
+            const present = await presentPaymentSheet();
+            if (present?.error) {
+              if (present.error.code === "Canceled") {
+                throw new Error("Cancelled");
+              }
+              throw new Error(present.error.message);
+            }
+            const confirmed = await api.post<{ ok: boolean; amount: number }>(
+              `/bookings/${booking.id}/confirm-payment`,
+            );
+            Alert.alert(t("booking.paymentSuccess"), `£${confirmed.amount.toFixed(2)} charged`, [
+              { text: "OK", onPress: () => router.back() },
+            ]);
+            return;
+          }
+        } catch (e: any) {
+          if (e.message === "Cancelled") {
+            return;
+          }
+          // Fall back to mock pay
+        }
+      }
+
+      // Mock fallback (web or no Stripe key)
       const res = await api.post<{ ok: boolean; payment_ref: string; amount: number }>(
         `/bookings/${booking.id}/pay`,
       );
       Alert.alert(
-        "Payment Successful",
-        `£${res.amount.toFixed(2)} charged\nRef: ${res.payment_ref}\n\n(Mock Stripe — production needs a dev build)`,
+        t("booking.paymentSuccess"),
+        `£${res.amount.toFixed(2)} charged\nRef: ${res.payment_ref}\n\n${useRealStripe ? "" : "(Mock — set EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY + dev build for real Stripe)"}`,
         [{ text: "OK", onPress: () => router.back() }],
       );
     } catch (e: any) {
@@ -78,6 +136,9 @@ export default function Booking() {
   };
 
   const selectedPlan = PLANS.find((p) => p.key === plan)!;
+  const showsSibling = plan === "monthly" && paidMonthlyCount >= 1;
+  const discountAmount = showsSibling ? +(selectedPlan.price * 0.2).toFixed(2) : 0;
+  const finalPrice = +(selectedPlan.price - discountAmount).toFixed(2);
 
   if (loading) {
     return (
@@ -253,6 +314,7 @@ const styles = StyleSheet.create({
   },
   payBarLabel: { fontSize: 11, color: COLORS.textSecondary, textTransform: "uppercase", letterSpacing: 0.5 },
   payBarAmount: { fontSize: 22, fontWeight: "800", color: COLORS.primary, marginTop: 2 },
+  discountText: { fontSize: 11, color: COLORS.success, fontWeight: "700", marginTop: 2 },
   payBtn: {
     flexDirection: "row",
     alignItems: "center",

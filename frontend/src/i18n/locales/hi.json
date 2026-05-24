@@ -1,0 +1,77 @@
+{
+  "app": { "name": "TripZen", "tagline": "हर बच्चे के लिए सुरक्षित सवारी" },
+  "common": {
+    "loading": "लोड हो रहा है…", "cancel": "रद्द करें", "confirm": "पुष्टि करें",
+    "save": "सहेजें", "delete": "हटाएं", "edit": "संपादित करें",
+    "back": "वापस", "next": "आगे", "submit": "भेजें",
+    "retry": "पुनः प्रयास करें", "error": "त्रुटि", "success": "सफल",
+    "close": "बंद करें", "yes": "हाँ", "no": "नहीं", "ok": "ठीक है", "all": "सभी"
+  },
+  "auth": {
+    "signIn": "साइन इन करें", "signUp": "साइन अप करें", "signOut": "साइन आउट",
+    "email": "ईमेल", "password": "पासवर्ड", "fullName": "पूरा नाम",
+    "phone": "फोन", "role": "मैं हूँ", "parent": "अभिभावक",
+    "driver": "चालक", "admin": "व्यवस्थापक",
+    "forgotPassword": "पासवर्ड भूल गए?",
+    "noAccount": "खाता नहीं है?", "haveAccount": "पहले से खाता है?",
+    "register": "खाता बनाएं", "welcomeBack": "वापसी पर स्वागत है",
+    "signInSubtitle": "अपने बच्चे को ट्रैक करने के लिए साइन इन करें",
+    "invalidCreds": "अमान्य ईमेल या पासवर्ड"
+  },
+  "parent": {
+    "hello": "नमस्ते, {{name}}", "todayUpdate": "आज का अपडेट",
+    "noChildren": "अभी तक कोई बच्चा नहीं जोड़ा",
+    "addChildSubtitle": "अपने बच्चे की प्रोफ़ाइल जोड़ें और मार्ग से लिंक करें।",
+    "bookRoute": "मार्ग बुक करें", "noActiveTrip": "कोई सक्रिय यात्रा नहीं",
+    "boarded": "बस में", "checkedOut": "सौंप दिया", "waiting": "प्रतीक्षा में",
+    "nextStop": "अगला: {{stop}}", "etaMin": "ETA {{min}} मिनट",
+    "geofenceWarning": "बस 500मी दूर है — कृपया बाहर जाएं",
+    "onTheWay": "रास्ते में", "liveTracking": "लाइव ट्रैकिंग",
+    "bookTrip": "यात्रा बुक करें", "chatDriver": "चालक से चैट",
+    "history": "इतिहास", "weeklySummary": "{{name}} के साथ इस सप्ताह",
+    "aiByClaude": "✨ Claude द्वारा AI", "yourChildren": "आपके बच्चे",
+    "schoolNotSet": "स्कूल सेट नहीं"
+  },
+  "driver": {
+    "welcomeBack": "वापसी पर स्वागत है", "todayRoutes": "आज के मार्ग",
+    "noRoutes": "कोई मार्ग नहीं सौंपा गया", "liveRoute": "● लाइव मार्ग",
+    "end": "समाप्त", "simulateMovement": "गति का अनुकरण",
+    "simulateSub": "डेमो के लिए बस की स्थिति स्वतः बढ़ाएं",
+    "sos": "SOS", "reportIssue": "समस्या रिपोर्ट करें",
+    "scanChild": "बच्चे को स्कैन करें", "start": "शुरू",
+    "morning": "🌅 सुबह", "afternoon": "🌆 दोपहर",
+    "endRoute": "मार्ग समाप्त करें?", "endRouteSub": "इस मार्ग को पूर्ण के रूप में चिह्नित करें।",
+    "sosConfirm": "आपातकालीन SOS ट्रिगर करें?",
+    "sosConfirmSub": "प्रशासन और सभी अभिभावकों को तुरंत सूचित किया जाएगा।",
+    "sendSos": "SOS भेजें", "incidentType": "प्रकार",
+    "incidentDesc": "विवरण", "incidentPlaceholder": "क्या हुआ बताएं…",
+    "submitReport": "रिपोर्ट जमा करें",
+    "trackBackground": "पृष्ठभूमि में ट्रैक करें",
+    "trackBackgroundSub": "GPS चलता रहेगा जब ऐप पृष्ठभूमि में हो"
+  },
+  "admin": {
+    "dashboard": "डैशबोर्ड", "routes": "मार्ग", "students": "छात्र",
+    "drivers": "चालक", "bookings": "बुकिंग", "alerts": "अलर्ट",
+    "account": "खाता", "totalRoutes": "कुल मार्ग",
+    "totalStudents": "कुल छात्र", "activeBuses": "सक्रिय बसें",
+    "onTime": "समय पर %"
+  },
+  "booking": {
+    "title": "यात्रा बुक करें", "selectChild": "बच्चा चुनें",
+    "selectRoute": "मार्ग चुनें", "choosePlan": "योजना चुनें",
+    "monthly": "मासिक योजना", "monthlySub": "असीमित दैनिक यात्राएं • सर्वोत्तम मूल्य",
+    "single": "एकल यात्रा", "singleSub": "एक बार की सवारी",
+    "total": "कुल", "payStripe": "Stripe से भुगतान करें",
+    "siblingDiscount": "भाई-बहन छूट: -£{{amount}} (20%)",
+    "paymentSuccess": "भुगतान सफल"
+  },
+  "chat": {
+    "title": "संदेश", "typeMessage": "संदेश लिखें…",
+    "send": "भेजें", "empty": "अभी तक कोई संदेश नहीं। हाय कहें!"
+  },
+  "settings": {
+    "language": "भाषा", "languageDesc": "अपनी पसंदीदा भाषा चुनें",
+    "notifications": "सूचनाएं", "gdprExport": "मेरा डेटा निर्यात करें",
+    "gdprDelete": "मेरा खाता हटाएं"
+  }
+}

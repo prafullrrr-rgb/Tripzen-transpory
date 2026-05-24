@@ -1,24 +1,39 @@
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, Alert } from "react-native";
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, Alert, Modal } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
+import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useAuth } from "@/src/contexts/AuthContext";
 import { COLORS, SPACING, RADIUS } from "@/src/constants/theme";
-import { confirm } from "@/src/utils/confirm";
+import { api } from "@/src/api/client";
+import { SUPPORTED_LANGS, setLanguage } from "@/src/i18n";
+import i18n from "@/src/i18n";
 
 export default function ParentAccount() {
   const { user, signOut } = useAuth();
   const router = useRouter();
+  const { t } = useTranslation();
+  const [langOpen, setLangOpen] = useState(false);
+  const [currentLang, setCurrentLang] = useState(i18n.language);
 
   const handleSignOut = async () => {
     await signOut();
     router.replace("/login");
   };
 
+  const pickLang = async (code: string) => {
+    await setLanguage(code);
+    setCurrentLang(code);
+    setLangOpen(false);
+  };
+
+  const activeLang = SUPPORTED_LANGS.find((l) => l.code === currentLang) || SUPPORTED_LANGS[0];
+
   return (
     <SafeAreaView style={styles.safe} edges={["top"]} testID="parent-account-screen">
       <ScrollView contentContainerStyle={{ padding: SPACING.lg, paddingBottom: 32 }}>
-        <Text style={styles.title}>Account</Text>
+        <Text style={styles.title}>{t("admin.account")}</Text>
 
         <View style={styles.profileCard}>
           <Image
@@ -35,15 +50,21 @@ export default function ParentAccount() {
         </View>
 
         <Text style={styles.sectionTitle}>Settings</Text>
-        <MenuItem icon="notifications" label="Notifications" testID="menu-notifications" />
+        <MenuItem icon="notifications" label={t("settings.notifications")} testID="menu-notifications" />
         <MenuItem icon="card" label="Payment Methods" testID="menu-payments" />
-        <MenuItem icon="language" label="Language" right="English" testID="menu-language" />
+        <MenuItem
+          icon="language"
+          label={t("settings.language")}
+          right={`${activeLang.flag} ${activeLang.label}`}
+          testID="menu-language"
+          onPress={() => setLangOpen(true)}
+        />
         <MenuItem icon="shield-checkmark" label="Privacy & Security" testID="menu-privacy" />
 
         <Text style={styles.sectionTitle}>Privacy & Data</Text>
         <MenuItem
           icon="download"
-          label="Export My Data (GDPR)"
+          label={t("settings.gdprExport")}
           testID="menu-gdpr-export"
           onPress={async () => {
             try {
@@ -55,7 +76,6 @@ export default function ParentAccount() {
             }
           }}
         />
-        <MenuItem icon="shield-checkmark" label="Privacy & Security" testID="menu-privacy" />
 
         <Text style={styles.sectionTitle}>Support</Text>
         <MenuItem icon="help-circle" label="Help Center" testID="menu-help" />
@@ -69,11 +89,40 @@ export default function ParentAccount() {
           activeOpacity={0.85}
         >
           <Ionicons name="log-out" size={18} color={COLORS.error} />
-          <Text style={styles.signoutText}>Sign out</Text>
+          <Text style={styles.signoutText}>{t("auth.signOut")}</Text>
         </TouchableOpacity>
 
         <Text style={styles.brandFooter}>TripZen v1.0 • Safe today. Stronger tomorrow.</Text>
       </ScrollView>
+
+      {/* Language picker modal */}
+      <Modal visible={langOpen} animationType="slide" transparent onRequestClose={() => setLangOpen(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modal}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>{t("settings.language")}</Text>
+              <TouchableOpacity onPress={() => setLangOpen(false)} testID="close-lang-modal">
+                <Ionicons name="close" size={24} color={COLORS.primary} />
+              </TouchableOpacity>
+            </View>
+            <Text style={styles.modalSub}>{t("settings.languageDesc")}</Text>
+            {SUPPORTED_LANGS.map((l) => (
+              <TouchableOpacity
+                key={l.code}
+                testID={`lang-${l.code}`}
+                style={[styles.langRow, currentLang === l.code && styles.langRowActive]}
+                onPress={() => pickLang(l.code)}
+              >
+                <Text style={styles.langFlag}>{l.flag}</Text>
+                <Text style={styles.langLabel}>{l.label}</Text>
+                {currentLang === l.code && (
+                  <Ionicons name="checkmark-circle" size={22} color={COLORS.accent} />
+                )}
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -163,4 +212,23 @@ const styles = StyleSheet.create({
     color: COLORS.textSecondary,
     marginTop: SPACING.lg,
   },
+  modalOverlay: { flex: 1, backgroundColor: "rgba(15, 27, 61, 0.5)", justifyContent: "flex-end" },
+  modal: { backgroundColor: COLORS.bg, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: SPACING.lg, paddingBottom: 28 },
+  modalHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: SPACING.sm },
+  modalTitle: { fontSize: 18, fontWeight: "800", color: COLORS.primary },
+  modalSub: { fontSize: 12, color: COLORS.textSecondary, marginBottom: SPACING.md },
+  langRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: COLORS.bgSecondary,
+    padding: SPACING.md,
+    borderRadius: RADIUS.md,
+    marginBottom: 8,
+    borderWidth: 1.5,
+    borderColor: COLORS.border,
+    gap: 12,
+  },
+  langRowActive: { borderColor: COLORS.accent, backgroundColor: COLORS.accentLight },
+  langFlag: { fontSize: 22 },
+  langLabel: { flex: 1, fontSize: 15, fontWeight: "700", color: COLORS.primary },
 });

@@ -14,9 +14,11 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import MapView, { Marker, PROVIDER_DEFAULT, Polyline } from "@/src/components/MapView";
 import { useRouter } from "expo-router";
+import { useTranslation } from "react-i18next";
 import { useAuth } from "@/src/contexts/AuthContext";
 import { api } from "@/src/api/client";
 import { COLORS, SPACING, RADIUS } from "@/src/constants/theme";
+import { useLiveTrip } from "@/src/hooks/useLiveTrip";
 
 type Student = {
   id: string;
@@ -51,6 +53,7 @@ type Route = {
 export default function ParentHome() {
   const { user } = useAuth();
   const router = useRouter();
+  const { t } = useTranslation();
   const [students, setStudents] = useState<Student[]>([]);
   const [trips, setTrips] = useState<Trip[]>([]);
   const [routes, setRoutes] = useState<Record<string, Route>>({});
@@ -61,6 +64,10 @@ export default function ParentHome() {
   const [aiSummary, setAiSummary] = useState<string | null>(null);
   const [aiLoading, setAiLoading] = useState(false);
   const [eta, setEta] = useState<{ minutes: number; distance: number; geofence: boolean; next: string } | null>(null);
+
+  // Live WS subscription for the active trip
+  const activeTripId = trips[0]?.id || null;
+  const { trip: liveTrip, connected: wsConnected } = useLiveTrip(activeTripId);
 
   const load = useCallback(async () => {
     try {
@@ -119,7 +126,8 @@ export default function ParentHome() {
 
   useEffect(() => {
     load();
-    intervalRef.current = setInterval(load, 8000);
+    // Slower polling — WS handles realtime location, polling just covers boarding/checkout/route changes
+    intervalRef.current = setInterval(load, 30000);
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current);
     };
@@ -135,7 +143,13 @@ export default function ParentHome() {
     setRefreshing(false);
   };
 
-  const activeTrip = trips[0];
+  // Merge live WS trip data on top of polled trips for instant updates
+  const baseActive = trips[0];
+  const activeTrip = baseActive
+    ? (liveTrip && liveTrip.id === baseActive.id
+        ? { ...baseActive, ...liveTrip }
+        : baseActive)
+    : null;
   const activeRoute = activeTrip ? routes[activeTrip.route_id] : null;
   const trackedStudent = students.find((s) => s.route_id === activeTrip?.route_id) || students[0];
 
@@ -152,9 +166,15 @@ export default function ParentHome() {
         {/* Header */}
         <View style={styles.header}>
           <View style={{ flex: 1 }}>
-            <Text style={styles.greeting}>Hello, {user?.full_name?.split(" ")[0] || "there"}</Text>
-            <Text style={styles.subgreeting}>Here is today's update</Text>
+            <Text style={styles.greeting}>{t("parent.hello", { name: user?.full_name?.split(" ")[0] || "there" })}</Text>
+            <Text style={styles.subgreeting}>{t("parent.todayUpdate")}</Text>
           </View>
+          {wsConnected && (
+            <View style={styles.liveChip} testID="ws-live-chip">
+              <View style={styles.liveChipDot} />
+              <Text style={styles.liveChipText}>LIVE</Text>
+            </View>
+          )}
           <TouchableOpacity
             testID="parent-notifications-btn"
             style={styles.bellBtn}
@@ -292,13 +312,13 @@ export default function ParentHome() {
             <View style={styles.quickRow}>
               <QuickAction
                 icon="calendar"
-                label="Book Trip"
+                label={t("parent.bookTrip")}
                 onPress={() => router.push("/parent/booking")}
                 testID="quick-book-btn"
               />
               <QuickAction
                 icon="chatbubbles"
-                label="Chat Driver"
+                label={t("parent.chatDriver")}
                 onPress={async () => {
                   // Find driver from active route
                   if (activeRoute?.driver_id) {
@@ -312,7 +332,7 @@ export default function ParentHome() {
               />
               <QuickAction
                 icon="time"
-                label="History"
+                label={t("parent.history")}
                 onPress={() => router.push("/parent/history")}
                 testID="quick-history-btn"
               />
@@ -325,21 +345,21 @@ export default function ParentHome() {
                   <View style={styles.aiIcon}>
                     <Ionicons name="sparkles" size={16} color={COLORS.primary} />
                   </View>
-                  <Text style={styles.aiTitle}>This week with {students[0].name}</Text>
+                  <Text style={styles.aiTitle}>{t("parent.weeklySummary", { name: students[0].name })}</Text>
                 </View>
                 {aiLoading ? (
                   <ActivityIndicator color={COLORS.accent} style={{ marginTop: 8 }} />
                 ) : (
                   <Text style={styles.aiSummary}>
-                    {aiSummary || "No activity to summarize yet."}
+                    {aiSummary || "—"}
                   </Text>
                 )}
-                <Text style={styles.aiFootnote}>✨ AI generated by Claude</Text>
+                <Text style={styles.aiFootnote}>{t("parent.aiByClaude")}</Text>
               </View>
             )}
 
             {/* Children list */}
-            <Text style={styles.sectionTitle}>Your children</Text>
+            <Text style={styles.sectionTitle}>{t("parent.yourChildren")}</Text>
             {students.map((s) => (
               <View key={s.id} style={styles.studentCard} testID={`student-card-${s.id}`}>
                 <Image
@@ -431,6 +451,18 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: COLORS.border,
   },
+  liveChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    backgroundColor: COLORS.success,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 999,
+    marginRight: 8,
+  },
+  liveChipDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: "#fff" },
+  liveChipText: { color: "#fff", fontSize: 10, fontWeight: "800", letterSpacing: 0.5 },
   tripCard: {
     marginHorizontal: SPACING.lg,
     backgroundColor: COLORS.bg,

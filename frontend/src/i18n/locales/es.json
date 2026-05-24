@@ -1,0 +1,79 @@
+{
+  "app": { "name": "TripZen", "tagline": "Viajes seguros para cada niño" },
+  "common": {
+    "loading": "Cargando…", "cancel": "Cancelar", "confirm": "Confirmar",
+    "save": "Guardar", "delete": "Eliminar", "edit": "Editar",
+    "back": "Atrás", "next": "Siguiente", "submit": "Enviar",
+    "retry": "Reintentar", "error": "Error", "success": "Éxito",
+    "close": "Cerrar", "yes": "Sí", "no": "No", "ok": "OK", "all": "Todos"
+  },
+  "auth": {
+    "signIn": "Iniciar Sesión", "signUp": "Registrarse", "signOut": "Cerrar Sesión",
+    "email": "Correo", "password": "Contraseña", "fullName": "Nombre Completo",
+    "phone": "Teléfono", "role": "Soy", "parent": "Padre/Madre",
+    "driver": "Conductor", "admin": "Administrador",
+    "forgotPassword": "¿Olvidaste tu contraseña?",
+    "noAccount": "¿No tienes una cuenta?",
+    "haveAccount": "¿Ya tienes una cuenta?",
+    "register": "Crear Cuenta", "welcomeBack": "Bienvenido de nuevo",
+    "signInSubtitle": "Inicia sesión para seguir a tu hijo",
+    "invalidCreds": "Correo o contraseña no válidos"
+  },
+  "parent": {
+    "hello": "Hola, {{name}}",
+    "todayUpdate": "Aquí está la actualización de hoy",
+    "noChildren": "Aún no se han añadido hijos",
+    "addChildSubtitle": "Añade el perfil de tu hijo y vincúlalo a una ruta.",
+    "bookRoute": "Reservar Ruta", "noActiveTrip": "Sin viaje activo",
+    "boarded": "A Bordo", "checkedOut": "Entregado", "waiting": "Esperando",
+    "nextStop": "Siguiente: {{stop}}", "etaMin": "ETA {{min}} min",
+    "geofenceWarning": "El bus está a 500m — sal afuera",
+    "onTheWay": "En camino", "liveTracking": "Seguimiento en vivo",
+    "bookTrip": "Reservar Viaje", "chatDriver": "Chatear Conductor",
+    "history": "Historial", "weeklySummary": "Esta semana con {{name}}",
+    "aiByClaude": "✨ Generado por Claude", "yourChildren": "Tus hijos",
+    "schoolNotSet": "Escuela sin definir"
+  },
+  "driver": {
+    "welcomeBack": "Bienvenido de nuevo", "todayRoutes": "Rutas de hoy",
+    "noRoutes": "Sin rutas asignadas", "liveRoute": "● RUTA EN VIVO",
+    "end": "Finalizar", "simulateMovement": "Simular Movimiento",
+    "simulateSub": "Avanzar posición automáticamente",
+    "sos": "SOS", "reportIssue": "Reportar Problema",
+    "scanChild": "Escanear Niño", "start": "Iniciar",
+    "morning": "🌅 Mañana", "afternoon": "🌆 Tarde",
+    "endRoute": "¿Finalizar ruta?", "endRouteSub": "Marcar esta ruta como completada.",
+    "sosConfirm": "¿Activar SOS de Emergencia?",
+    "sosConfirmSub": "Admin y todos los padres serán notificados de inmediato.",
+    "sendSos": "Enviar SOS", "incidentType": "Tipo",
+    "incidentDesc": "Descripción", "incidentPlaceholder": "Describe lo sucedido…",
+    "submitReport": "Enviar Reporte",
+    "trackBackground": "Rastrear en segundo plano",
+    "trackBackgroundSub": "GPS continúa cuando la app está en segundo plano"
+  },
+  "admin": {
+    "dashboard": "Panel", "routes": "Rutas", "students": "Estudiantes",
+    "drivers": "Conductores", "bookings": "Reservas", "alerts": "Alertas",
+    "account": "Cuenta", "totalRoutes": "Total de Rutas",
+    "totalStudents": "Total de Estudiantes", "activeBuses": "Buses Activos",
+    "onTime": "% Puntual"
+  },
+  "booking": {
+    "title": "Reservar un Viaje", "selectChild": "Seleccionar Hijo",
+    "selectRoute": "Seleccionar Ruta", "choosePlan": "Elegir Plan",
+    "monthly": "Plan Mensual", "monthlySub": "Viajes diarios ilimitados • Mejor valor",
+    "single": "Viaje Único", "singleSub": "Un viaje único",
+    "total": "Total", "payStripe": "Pagar con Stripe",
+    "siblingDiscount": "Descuento por hermano: -£{{amount}} (20%)",
+    "paymentSuccess": "Pago Exitoso"
+  },
+  "chat": {
+    "title": "Mensajes", "typeMessage": "Escribe un mensaje…",
+    "send": "Enviar", "empty": "Sin mensajes aún. ¡Saluda!"
+  },
+  "settings": {
+    "language": "Idioma", "languageDesc": "Elige tu idioma preferido",
+    "notifications": "Notificaciones", "gdprExport": "Exportar Mis Datos",
+    "gdprDelete": "Eliminar Mi Cuenta"
+  }
+}

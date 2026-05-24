@@ -10,7 +10,7 @@ from pathlib import Path
 from datetime import datetime, timezone, timedelta
 from typing import List, Optional, Literal
 
-from fastapi import FastAPI, APIRouter, HTTPException, Depends, status, UploadFile, File
+from fastapi import FastAPI, APIRouter, HTTPException, Depends, status, UploadFile, File, WebSocket, WebSocketDisconnect
 from fastapi.security import OAuth2PasswordBearer
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
@@ -18,6 +18,8 @@ from pydantic import BaseModel, Field, EmailStr
 from dotenv import load_dotenv
 import bcrypt
 import jwt
+import asyncio
+import httpx
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / ".env")
@@ -441,6 +443,12 @@ async def update_location(trip_id: str, body: LocationUpdate, user: dict = Depen
         upd["current_stop_index"] = body.stop_index
     await db.trips.update_one({"id": trip_id, "driver_id": user["id"]}, {"$set": upd})
     trip = await db.trips.find_one({"id": trip_id}, {"_id": 0})
+    # Broadcast to live WS subscribers
+    if trip:
+        try:
+            await ws_manager.broadcast(trip_id, {"type": "location", "trip": trip})
+        except Exception:
+            pass
     return trip
 
 
@@ -1058,6 +1066,229 @@ async def weekly_summary(student_id: str, user: dict = Depends(require_roles("pa
 @api.get("/")
 async def root():
     return {"app": "TripZen", "status": "ok"}
+
+
+# ----- WebSockets (Live Trip Tracking) -----
+class TripWSManager:
+    def __init__(self):
+        self.connections: dict[str, list[WebSocket]] = {}
+
+    async def connect(self, trip_id: str, ws: WebSocket):
+        await ws.accept()
+        self.connections.setdefault(trip_id, []).append(ws)
+
+    def disconnect(self, trip_id: str, ws: WebSocket):
+        conns = self.connections.get(trip_id, [])
+        if ws in conns:
+            conns.remove(ws)
+        if not conns and trip_id in self.connections:
+            self.connections.pop(trip_id, None)
+
+    async def broadcast(self, trip_id: str, payload: dict):
+        dead: list[WebSocket] = []
+        for ws in list(self.connections.get(trip_id, [])):
+            try:
+                await ws.send_json(payload)
+            except Exception:
+                dead.append(ws)
+        for ws in dead:
+            self.disconnect(trip_id, ws)
+
+
+ws_manager = TripWSManager()
+
+
+@app.websocket("/api/ws/trip/{trip_id}")
+async def trip_websocket(websocket: WebSocket, trip_id: str):
+    """Stream live location updates for a trip. Clients can also send a ping JSON to keep alive."""
+    await ws_manager.connect(trip_id, websocket)
+    try:
+        # Send initial snapshot if trip exists
+        trip = await db.trips.find_one({"id": trip_id}, {"_id": 0})
+        if trip:
+            await websocket.send_json({"type": "snapshot", "trip": trip})
+        while True:
+            try:
+                msg = await asyncio.wait_for(websocket.receive_text(), timeout=30.0)
+                # Echo ping or ignore
+                if msg.strip().lower() == "ping":
+                    await websocket.send_text("pong")
+            except asyncio.TimeoutError:
+                try:
+                    await websocket.send_text("keepalive")
+                except Exception:
+                    break
+    except WebSocketDisconnect:
+        pass
+    except Exception as e:
+        logger.exception("ws error: %s", e)
+    finally:
+        ws_manager.disconnect(trip_id, websocket)
+
+
+# ----- Push Notification Tokens -----
+class PushTokenIn(BaseModel):
+    token: str
+    platform: Optional[Literal["ios", "android", "web"]] = None
+
+
+@api.post("/users/push-token")
+async def save_push_token(body: PushTokenIn, user: dict = Depends(get_current_user)):
+    await db.users.update_one(
+        {"id": user["id"]},
+        {"$set": {"push_token": body.token, "push_platform": body.platform, "push_updated_at": now_iso()}},
+    )
+    return {"ok": True}
+
+
+async def _send_expo_push(tokens: List[str], title: str, body: str, data: Optional[dict] = None):
+    """Send via Expo Push API. Silently no-ops if no tokens. Safe to call without setup."""
+    valid = [t for t in tokens if t and t.startswith("ExponentPushToken")]
+    if not valid:
+        return {"sent": 0, "reason": "no_valid_tokens"}
+    messages = [{"to": t, "title": title, "body": body, "data": data or {}, "sound": "default"} for t in valid]
+    try:
+        async with httpx.AsyncClient(timeout=10) as client_h:
+            res = await client_h.post(
+                "https://exp.host/--/api/v2/push/send",
+                json=messages,
+                headers={"Content-Type": "application/json", "Accept": "application/json"},
+            )
+            return {"sent": len(valid), "status": res.status_code}
+    except Exception as e:
+        logger.warning("Expo push failed: %s", e)
+        return {"sent": 0, "error": str(e)[:200]}
+
+
+async def _notify_user_full(user_id: str, title: str, body: str, ntype: str = "alert", student_id: Optional[str] = None, icon: Optional[str] = None, data: Optional[dict] = None):
+    """Create in-app notification + send Expo push (if token present)."""
+    await _create_notification(user_id, student_id, ntype, title, body, icon)
+    user_doc = await db.users.find_one({"id": user_id}, {"push_token": 1, "_id": 0})
+    if user_doc and user_doc.get("push_token"):
+        await _send_expo_push([user_doc["push_token"]], title, body, data)
+
+
+# ----- WhatsApp Notifications (Twilio) -----
+TWILIO_SID = os.environ.get("TWILIO_ACCOUNT_SID", "")
+TWILIO_TOKEN = os.environ.get("TWILIO_AUTH_TOKEN", "")
+TWILIO_WA_FROM = os.environ.get("TWILIO_WHATSAPP_FROM", "")  # e.g. whatsapp:+14155238886
+
+
+class WhatsAppIn(BaseModel):
+    to_phone: str  # e.g. +447700900222
+    message: str
+
+
+@api.post("/notifications/whatsapp")
+async def send_whatsapp(body: WhatsAppIn, user: dict = Depends(get_current_user)):
+    """Send WhatsApp via Twilio. Returns mocked=true if Twilio not configured."""
+    if not (TWILIO_SID and TWILIO_TOKEN and TWILIO_WA_FROM):
+        # Soft mock — still log the intent
+        logger.info("WhatsApp MOCK send to=%s msg=%s", body.to_phone, body.message[:80])
+        return {"ok": True, "mocked": True, "to": body.to_phone}
+    try:
+        async with httpx.AsyncClient(timeout=10) as client_h:
+            res = await client_h.post(
+                f"https://api.twilio.com/2010-04-01/Accounts/{TWILIO_SID}/Messages.json",
+                data={
+                    "From": TWILIO_WA_FROM,
+                    "To": f"whatsapp:{body.to_phone}" if not body.to_phone.startswith("whatsapp:") else body.to_phone,
+                    "Body": body.message,
+                },
+                auth=(TWILIO_SID, TWILIO_TOKEN),
+            )
+            if res.status_code >= 400:
+                raise HTTPException(502, f"Twilio error: {res.text[:200]}")
+            return {"ok": True, "mocked": False, "sid": res.json().get("sid")}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("whatsapp send failed")
+        raise HTTPException(500, str(e)[:200])
+
+
+# ----- Stripe Payment Intent (real SDK ready) -----
+STRIPE_SECRET_KEY = os.environ.get("STRIPE_SECRET_KEY", "")
+
+
+@api.post("/bookings/{bid}/payment-intent")
+async def create_payment_intent(bid: str, user: dict = Depends(require_roles("parent"))):
+    """Create a real Stripe PaymentIntent if STRIPE_SECRET_KEY is set, else return mock client_secret."""
+    booking = await db.bookings.find_one({"id": bid, "parent_id": user["id"]}, {"_id": 0})
+    if not booking:
+        raise HTTPException(404, "Booking not found")
+    if booking["status"] == "paid":
+        raise HTTPException(400, "Already paid")
+    amount_pence = int(round(booking["amount"] * 100))
+    if not STRIPE_SECRET_KEY:
+        # Mock
+        return {
+            "client_secret": f"pi_mock_{uuid.uuid4().hex[:16]}_secret_mock",
+            "publishable_key": os.environ.get("STRIPE_PUBLISHABLE_KEY", "pk_test_mock"),
+            "amount": booking["amount"],
+            "currency": booking["currency"].lower(),
+            "mocked": True,
+        }
+    try:
+        async with httpx.AsyncClient(timeout=15) as client_h:
+            res = await client_h.post(
+                "https://api.stripe.com/v1/payment_intents",
+                data={
+                    "amount": amount_pence,
+                    "currency": booking["currency"].lower(),
+                    "metadata[booking_id]": bid,
+                    "metadata[parent_id]": user["id"],
+                    "automatic_payment_methods[enabled]": "true",
+                },
+                auth=(STRIPE_SECRET_KEY, ""),
+            )
+            data = res.json()
+            if res.status_code >= 400:
+                raise HTTPException(502, data.get("error", {}).get("message", "Stripe error"))
+            await db.bookings.update_one(
+                {"id": bid},
+                {"$set": {"payment_intent_id": data["id"]}},
+            )
+            return {
+                "client_secret": data["client_secret"],
+                "publishable_key": os.environ.get("STRIPE_PUBLISHABLE_KEY", ""),
+                "amount": booking["amount"],
+                "currency": booking["currency"].lower(),
+                "mocked": False,
+            }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("Stripe PI failed")
+        raise HTTPException(500, str(e)[:200])
+
+
+@api.post("/bookings/{bid}/confirm-payment")
+async def confirm_payment(bid: str, user: dict = Depends(require_roles("parent"))):
+    """Called by frontend after Stripe PaymentSheet succeeds. Verifies w/ Stripe if key present."""
+    booking = await db.bookings.find_one({"id": bid, "parent_id": user["id"]}, {"_id": 0})
+    if not booking:
+        raise HTTPException(404, "Booking not found")
+    pi_id = booking.get("payment_intent_id")
+    if STRIPE_SECRET_KEY and pi_id and not pi_id.startswith("pi_mock"):
+        try:
+            async with httpx.AsyncClient(timeout=10) as client_h:
+                r = await client_h.get(
+                    f"https://api.stripe.com/v1/payment_intents/{pi_id}",
+                    auth=(STRIPE_SECRET_KEY, ""),
+                )
+                data = r.json()
+                if data.get("status") != "succeeded":
+                    raise HTTPException(400, f"Payment not completed: {data.get('status')}")
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.warning("Stripe verify failed: %s", e)
+    await db.bookings.update_one(
+        {"id": bid},
+        {"$set": {"status": "paid", "paid_at": now_iso(), "payment_ref": pi_id or f"pi_test_{uuid.uuid4().hex[:16]}"}},
+    )
+    return {"ok": True, "amount": booking["amount"]}
 
 
 # ----- Seed Data -----

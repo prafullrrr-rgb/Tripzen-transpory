@@ -305,6 +305,66 @@ backend:
         agent: "testing"
         comment: "All five admin endpoints return 200 with sensible fields. /admin/stats has total_routes/total_students/active_buses/on_time_percent/completed_today/total_drivers/total_parents. /admin/revenue → {total_revenue:431.95, paid_bookings:5, pending_bookings:2, currency:GBP}. /admin/users count=5. /admin/alerts and /admin/incidents working. Parent gets 403 on /admin/stats as expected."
 
+  - task: "WebSocket live trip tracking"
+    implemented: true
+    working: true
+    file: "backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "NEW: /api/ws/trip/{trip_id} — on connect send snapshot, broadcast location frames when driver POSTs /trips/{id}/location, respond 'pong' to 'ping'."
+      - working: true
+        agent: "testing"
+        comment: "WSS handshake to wss://…/api/ws/trip/{trip_id} succeeded. First frame was JSON {type:'snapshot', trip:{...}} carrying the correct current_lat/current_lng (51.5174,-0.1378). Driver POST /trips/{trip_id}/location with (51.521,-0.09) returned 200 and a subsequent JSON frame {type:'location', trip:{...}} with the updated coords was received on the same WS within ~1s. Text 'ping' → text 'pong' reply confirmed. Clean close OK."
+
+  - task: "Push notification token storage"
+    implemented: true
+    working: true
+    file: "backend/server.py"
+    stuck_count: 0
+    priority: "medium"
+    needs_retesting: false
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "NEW: POST /api/users/push-token { token, platform } persists token+platform on the authenticated user."
+      - working: true
+        agent: "testing"
+        comment: "Parent POST /users/push-token with ExponentPushToken[abc123]/ios → 200 {ok:true}. Re-POST with ExponentPushToken[xyz999]/android (overwrite) → 200 {ok:true} (idempotent). Negative: omitting Authorization header → 401 as expected."
+
+  - task: "Stripe payment intent + confirm"
+    implemented: true
+    working: true
+    file: "backend/server.py"
+    stuck_count: 0
+    priority: "medium"
+    needs_retesting: false
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "NEW: POST /api/bookings/{bid}/payment-intent returns mocked client_secret (pi_mock_*) when STRIPE_SECRET_KEY unset, real PI otherwise. POST /api/bookings/{bid}/confirm-payment marks booking paid."
+      - working: true
+        agent: "testing"
+        comment: "Created fresh single-trip booking (amount=4.5). /payment-intent → 200 with client_secret starting 'pi_mock_eaec15240eef4a76_secret_mock', publishable_key='pk_test_mock', amount=4.5, currency='gbp', mocked=true. /confirm-payment → 200 {ok:true, amount:4.5}. GET /bookings shows the booking with status='paid' and payment_ref='pi_test_…'. Negative: re-calling /payment-intent on the now-paid booking → 400 {detail:'Already paid'} ✅."
+
+  - task: "WhatsApp notifications (Twilio)"
+    implemented: true
+    working: true
+    file: "backend/server.py"
+    stuck_count: 0
+    priority: "low"
+    needs_retesting: false
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "NEW: POST /api/notifications/whatsapp sends via Twilio when env vars set, else returns mocked=true."
+      - working: true
+        agent: "testing"
+        comment: "Admin POST /notifications/whatsapp {to_phone:'+447700900222', message:'Hello from test'} → 200 {ok:true, mocked:true, to:'+447700900222'} — TWILIO_* env vars are unset so the MOCKED path is exercised, as expected. Backend log line 'WhatsApp MOCK send to=+447700900222 msg=Hello from test' confirms intent is logged."
+
 frontend:
   - task: "Login / Register / Auth gate"
     implemented: true
@@ -368,23 +428,20 @@ metadata:
   run_ui: false
 
 test_plan:
-  current_focus:
-    - "Auth (register / login / me) with role check"
-    - "Students CRUD (parent + admin)"
-    - "Trips lifecycle (start/location/end/scan/active)"
-    - "Bookings + Mock Payment + Sibling Discount"
-    - "Driver SOS & Incident Reporting"
-    - "Parent ↔ Driver Chat (send/list/threads)"
-    - "AI Weekly Summary (Emergent LLM)"
-    - "GDPR Export & Delete"
-    - "Trip Ratings (parent feedback)"
-    - "Geofence ETA"
-    - "Admin stats / revenue / users / alerts / incidents"
+  current_focus: []
   stuck_tasks: []
   test_all: false
   test_priority: "high_first"
 
 agent_communication:
+  - agent: "main"
+    message: |
+      Phase 2: 4 NEW backend endpoints added — please test only these:
+        1. WebSocket /api/ws/trip/{trip_id} — connect, expect snapshot frame, then have driver POST /api/trips/{id}/location and expect a `location` frame on the WS.
+        2. POST /api/users/push-token { token, platform } as parent — expect 200 ok=true.
+        3. POST /api/bookings/{bid}/payment-intent as parent — expect 200 + mocked=true + client_secret prefixed with pi_mock_; then POST /api/bookings/{bid}/confirm-payment — expect ok=true, status=paid.
+        4. POST /api/notifications/whatsapp { to_phone, message } as any role — expect 200 + mocked=true (Twilio env not set).
+      All other endpoints already verified previously — do not retest.
   - agent: "testing"
     message: |
       Frontend E2E mobile testing (iPhone 12 390x844 + Galaxy S21 360x800) on TripZen.
@@ -451,3 +508,33 @@ agent_communication:
         ✅ Admin stats/revenue/users/alerts/incidents all 200, parent gets 403
       CSV bulk import was not exercised (low priority, not in current_focus).
       No critical issues. Backend is production-quality for the 11 in-scope features.
+  - agent: "testing"
+    message: |
+      Phase 2 — 4 NEW backend endpoints all PASS (14/14 checks against
+      EXPO_PUBLIC_BACKEND_URL=https://app-builder-demo-60.preview.emergentagent.com).
+
+      ✅ WebSocket /api/ws/trip/{trip_id}: wss handshake OK → first frame
+         {type:'snapshot', trip:{id, current_lat:51.5174, current_lng:-0.1378,…}}.
+         Driver POST /trips/{id}/location {lat:51.521,lng:-0.09} → 200, and within
+         <1s a {type:'location', trip:{current_lat:51.521,current_lng:-0.09,…}}
+         frame arrived on the same socket. Text 'ping' → text 'pong' verified.
+      ✅ POST /api/users/push-token (parent priya): {token,platform} → 200 {ok:true};
+         overwrite with new token+platform → 200; no-auth call → 401.
+      ✅ POST /api/bookings/{bid}/payment-intent: returns mocked client_secret
+         'pi_mock_…_secret_mock', publishable_key='pk_test_mock', amount=4.5,
+         currency='gbp', mocked=true (STRIPE_SECRET_KEY intentionally unset).
+         POST /confirm-payment → 200 {ok:true, amount:4.5}; booking status flips
+         to 'paid' with payment_ref='pi_test_…'. Re-calling /payment-intent on
+         the now-paid booking returns 400 {'detail':'Already paid'}.
+      ✅ POST /api/notifications/whatsapp: 200 {ok:true, mocked:true,
+         to:'+447700900222'} — Twilio env vars unset so MOCKED path runs (backend
+         log confirms 'WhatsApp MOCK send to=… msg=…').
+
+      One trivial test-script fix-up made (not a product bug):
+        • /api/auth/login returns 'access_token' (not 'token') and /api/trips/active
+          returns a list. The backend_test.py helpers were adjusted to read the
+          correct keys; no server code changed. Main agent — DO NOT modify these
+          response shapes, they are already correct and consistent with frontend
+          usage.
+
+      All 4 in-scope phase-2 tasks are green; no critical issues.

@@ -16,9 +16,15 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
+import { useTranslation } from "react-i18next";
 import { useAuth } from "@/src/contexts/AuthContext";
 import { api } from "@/src/api/client";
 import { COLORS, SPACING, RADIUS } from "@/src/constants/theme";
+import {
+  startBackgroundTracking,
+  stopBackgroundTracking,
+  isBackgroundTrackingActive,
+} from "@/src/utils/backgroundLocation";
 
 type Stop = { id: string; name: string; lat: number; lng: number; order: number; eta?: string };
 type Route = {
@@ -44,16 +50,47 @@ type Trip = {
 export default function DriverHome() {
   const { user } = useAuth();
   const router = useRouter();
+  const { t } = useTranslation();
   const [routes, setRoutes] = useState<Route[]>([]);
   const [activeTrip, setActiveTrip] = useState<Trip | null>(null);
   const [loading, setLoading] = useState(true);
   const [starting, setStarting] = useState(false);
   const [simulate, setSimulate] = useState(false);
+  const [bgTracking, setBgTracking] = useState(false);
   const [incidentOpen, setIncidentOpen] = useState(false);
   const [incidentType, setIncidentType] = useState<"delay" | "breakdown" | "traffic" | "behavior" | "other">("delay");
   const [incidentDesc, setIncidentDesc] = useState("");
   const [incidentSubmitting, setIncidentSubmitting] = useState(false);
   const simulateRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Check if background tracking is already running for the current trip on mount
+  useEffect(() => {
+    (async () => {
+      const active = await isBackgroundTrackingActive();
+      setBgTracking(active);
+    })();
+  }, [activeTrip?.id]);
+
+  const onToggleBgTracking = async (value: boolean) => {
+    if (!activeTrip) return;
+    if (value) {
+      const ok = await startBackgroundTracking(activeTrip.id);
+      if (!ok) {
+        Alert.alert(
+          "Permission needed",
+          Platform.OS === "web"
+            ? "Background GPS works on a development build only."
+            : "Background location permission is required. Please enable it in Settings.",
+        );
+        setBgTracking(false);
+        return;
+      }
+      setBgTracking(true);
+    } else {
+      await stopBackgroundTracking();
+      setBgTracking(false);
+    }
+  };
 
   const load = useCallback(async () => {
     try {
@@ -124,21 +161,24 @@ export default function DriverHome() {
 
   const endRoute = async () => {
     if (!activeTrip) return;
-    Alert.alert("End route?", "Mark this route as completed.", [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "End",
-        style: "destructive",
-        onPress: async () => {
-          try {
-            await api.post(`/trips/${activeTrip.id}/end`);
-            setActiveTrip(null);
-            setSimulate(false);
-          } catch (e: any) {
-            Alert.alert("Failed", e.message);
-          }
-        },
-      },
+    const doEnd = async () => {
+      try {
+        await api.post(`/trips/${activeTrip.id}/end`);
+        await stopBackgroundTracking();
+        setActiveTrip(null);
+        setSimulate(false);
+        setBgTracking(false);
+      } catch (e: any) {
+        Alert.alert(t("common.error"), e.message);
+      }
+    };
+    if (Platform.OS === "web") {
+      doEnd();
+      return;
+    }
+    Alert.alert(t("driver.endRoute"), t("driver.endRouteSub"), [
+      { text: t("common.cancel"), style: "cancel" },
+      { text: t("driver.end"), style: "destructive", onPress: doEnd },
     ]);
   };
 
@@ -233,14 +273,29 @@ export default function DriverHome() {
 
             <View style={styles.simRow}>
               <View>
-                <Text style={styles.simLabel}>Simulate Movement</Text>
-                <Text style={styles.simSub}>Auto-advance bus position for demo</Text>
+                <Text style={styles.simLabel}>{t("driver.simulateMovement")}</Text>
+                <Text style={styles.simSub}>{t("driver.simulateSub")}</Text>
               </View>
               <Switch
                 testID="simulate-toggle"
                 value={simulate}
                 onValueChange={setSimulate}
                 trackColor={{ false: COLORS.border, true: COLORS.accent }}
+                thumbColor={COLORS.bg}
+              />
+            </View>
+
+            {/* Background GPS toggle */}
+            <View style={styles.simRow}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.simLabel}>{t("driver.trackBackground")}</Text>
+                <Text style={styles.simSub}>{t("driver.trackBackgroundSub")}</Text>
+              </View>
+              <Switch
+                testID="bg-track-toggle"
+                value={bgTracking}
+                onValueChange={onToggleBgTracking}
+                trackColor={{ false: COLORS.border, true: COLORS.success }}
                 thumbColor={COLORS.bg}
               />
             </View>

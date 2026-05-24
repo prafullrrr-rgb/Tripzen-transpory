@@ -16,6 +16,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import { api } from "@/src/api/client";
 import { COLORS, SPACING, RADIUS } from "@/src/constants/theme";
+import { isNfcSupported, scanNfcTag } from "@/src/utils/nfc";
 
 type Trip = { id: string; route_name: string };
 
@@ -29,14 +30,32 @@ export default function DriverScan() {
   const [loading, setLoading] = useState(false);
   const [manualCode, setManualCode] = useState("");
   const [showManual, setShowManual] = useState(Platform.OS === "web");
+  const [nfcAvailable, setNfcAvailable] = useState(false);
+  const [nfcScanning, setNfcScanning] = useState(false);
   const scannedRef = useRef<string | null>(null);
 
   useEffect(() => {
     (async () => {
       const trips = await api.get<Trip[]>("/trips/active");
       setTrip(trips[0] || null);
+      const supported = await isNfcSupported();
+      setNfcAvailable(supported);
     })();
   }, []);
+
+  const scanWithNfc = async () => {
+    setNfcScanning(true);
+    try {
+      const code = await scanNfcTag();
+      if (code) {
+        await handleCode(code);
+      } else {
+        Alert.alert("No tag", "Could not read NFC tag. Try again.");
+      }
+    } finally {
+      setNfcScanning(false);
+    }
+  };
 
   const handleCode = async (code: string) => {
     if (loading || !trip) return;
@@ -202,6 +221,26 @@ export default function DriverScan() {
         </TouchableOpacity>
       )}
 
+      {/* NFC scan (native only) */}
+      {nfcAvailable && (
+        <TouchableOpacity
+          testID="nfc-scan-btn"
+          style={styles.nfcBtn}
+          onPress={scanWithNfc}
+          disabled={nfcScanning || loading}
+          activeOpacity={0.85}
+        >
+          {nfcScanning ? (
+            <ActivityIndicator color={COLORS.primary} />
+          ) : (
+            <>
+              <Ionicons name="wifi" size={20} color={COLORS.primary} style={{ transform: [{ rotate: "90deg" }] }} />
+              <Text style={styles.nfcBtnText}>Scan NFC badge</Text>
+            </>
+          )}
+        </TouchableOpacity>
+      )}
+
       {/* Result */}
       {lastResult && (
         <View style={styles.resultCard} testID="scan-result">
@@ -301,6 +340,20 @@ const styles = StyleSheet.create({
   manualBtnText: { color: COLORS.primary, fontWeight: "800", fontSize: 15 },
   linkBtn: { alignItems: "center", marginTop: SPACING.md },
   linkText: { color: COLORS.textSecondary, fontSize: 13, textDecorationLine: "underline" },
+  nfcBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    backgroundColor: COLORS.accentLight,
+    marginHorizontal: SPACING.lg,
+    marginTop: SPACING.md,
+    paddingVertical: 14,
+    borderRadius: RADIUS.md,
+    borderWidth: 1.5,
+    borderColor: COLORS.accent,
+  },
+  nfcBtnText: { color: COLORS.primary, fontWeight: "800", fontSize: 14 },
   resultCard: {
     flexDirection: "row",
     alignItems: "center",

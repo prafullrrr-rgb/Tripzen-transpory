@@ -39,8 +39,59 @@
         {
           "cameraPermission": "Scan student QR badges for safe boarding."
         }
+      ],
+      "expo-localization",
+      "react-native-nfc-manager",
+      [
+        "@stripe/stripe-react-native",
+        {
+          "merchantIdentifier": "merchant.com.tripzen",
+          "enableGooglePay": false
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "color": "#FCB813"
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "TripZen tracks the bus during routes to keep parents informed.",
+          "locationWhenInUsePermission": "TripZen tracks the bus during routes to keep parents informed.",
+          "isIosBackgroundLocationEnabled": true,
+          "isAndroidBackgroundLocationEnabled": true
+        }
       ]
     ],
+    "ios": {
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSCameraUsageDescription": "Scan student QR badges for safe boarding.",
+        "NSLocationWhenInUseUsageDescription": "Track the bus route in real-time.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "Keep parents updated when the bus is in service.",
+        "UIBackgroundModes": ["location", "fetch", "remote-notification"]
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/images/adaptive-icon.png",
+        "backgroundColor": "#000"
+      },
+      "edgeToEdgeEnabled": true,
+      "permissions": [
+        "CAMERA",
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_BACKGROUND_LOCATION",
+        "FOREGROUND_SERVICE",
+        "FOREGROUND_SERVICE_LOCATION",
+        "POST_NOTIFICATIONS",
+        "VIBRATE",
+        "NFC"
+      ]
+    },
     "experiments": {
       "typedRoutes": true
     }

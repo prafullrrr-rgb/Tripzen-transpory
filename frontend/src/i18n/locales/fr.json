@@ -1,0 +1,77 @@
+{
+  "app": { "name": "TripZen", "tagline": "Des trajets sûrs pour chaque enfant" },
+  "common": {
+    "loading": "Chargement…", "cancel": "Annuler", "confirm": "Confirmer",
+    "save": "Enregistrer", "delete": "Supprimer", "edit": "Modifier",
+    "back": "Retour", "next": "Suivant", "submit": "Envoyer",
+    "retry": "Réessayer", "error": "Erreur", "success": "Succès",
+    "close": "Fermer", "yes": "Oui", "no": "Non", "ok": "OK", "all": "Tous"
+  },
+  "auth": {
+    "signIn": "Se Connecter", "signUp": "S'inscrire", "signOut": "Se Déconnecter",
+    "email": "E-mail", "password": "Mot de passe", "fullName": "Nom Complet",
+    "phone": "Téléphone", "role": "Je suis", "parent": "Parent",
+    "driver": "Chauffeur", "admin": "Administrateur",
+    "forgotPassword": "Mot de passe oublié ?",
+    "noAccount": "Pas de compte ?", "haveAccount": "Déjà un compte ?",
+    "register": "Créer un Compte", "welcomeBack": "Bon retour",
+    "signInSubtitle": "Connectez-vous pour suivre votre enfant",
+    "invalidCreds": "E-mail ou mot de passe invalide"
+  },
+  "parent": {
+    "hello": "Bonjour, {{name}}", "todayUpdate": "Voici la mise à jour d'aujourd'hui",
+    "noChildren": "Aucun enfant ajouté pour l'instant",
+    "addChildSubtitle": "Ajoutez le profil de votre enfant et liez-le à un itinéraire.",
+    "bookRoute": "Réserver un Itinéraire", "noActiveTrip": "Aucun voyage actif",
+    "boarded": "À Bord", "checkedOut": "Déposé", "waiting": "En attente",
+    "nextStop": "Prochain : {{stop}}", "etaMin": "ETA {{min}} min",
+    "geofenceWarning": "Le bus est à 500m — sortez maintenant",
+    "onTheWay": "En route", "liveTracking": "Suivi en direct",
+    "bookTrip": "Réserver", "chatDriver": "Discuter",
+    "history": "Historique", "weeklySummary": "Cette semaine avec {{name}}",
+    "aiByClaude": "✨ IA générée par Claude", "yourChildren": "Vos enfants",
+    "schoolNotSet": "École non définie"
+  },
+  "driver": {
+    "welcomeBack": "Bon retour", "todayRoutes": "Itinéraires du jour",
+    "noRoutes": "Aucun itinéraire assigné", "liveRoute": "● ITINÉRAIRE EN DIRECT",
+    "end": "Terminer", "simulateMovement": "Simuler le Mouvement",
+    "simulateSub": "Avancer la position automatiquement",
+    "sos": "SOS", "reportIssue": "Signaler un Problème",
+    "scanChild": "Scanner l'Enfant", "start": "Démarrer",
+    "morning": "🌅 Matin", "afternoon": "🌆 Après-midi",
+    "endRoute": "Terminer l'itinéraire ?", "endRouteSub": "Marquer cet itinéraire comme terminé.",
+    "sosConfirm": "Déclencher le SOS d'urgence ?",
+    "sosConfirmSub": "L'admin et tous les parents seront notifiés immédiatement.",
+    "sendSos": "Envoyer SOS", "incidentType": "Type",
+    "incidentDesc": "Description", "incidentPlaceholder": "Décrivez ce qui s'est passé…",
+    "submitReport": "Soumettre",
+    "trackBackground": "Suivi en arrière-plan",
+    "trackBackgroundSub": "Le GPS continue quand l'app est en arrière-plan"
+  },
+  "admin": {
+    "dashboard": "Tableau de bord", "routes": "Itinéraires", "students": "Élèves",
+    "drivers": "Chauffeurs", "bookings": "Réservations", "alerts": "Alertes",
+    "account": "Compte", "totalRoutes": "Total Itinéraires",
+    "totalStudents": "Total Élèves", "activeBuses": "Bus Actifs",
+    "onTime": "% à l'heure"
+  },
+  "booking": {
+    "title": "Réserver un Voyage", "selectChild": "Sélectionner l'Enfant",
+    "selectRoute": "Sélectionner l'Itinéraire", "choosePlan": "Choisir le Plan",
+    "monthly": "Plan Mensuel", "monthlySub": "Trajets quotidiens illimités • Meilleur prix",
+    "single": "Trajet Unique", "singleSub": "Trajet unique",
+    "total": "Total", "payStripe": "Payer avec Stripe",
+    "siblingDiscount": "Remise frère/sœur : -£{{amount}} (20%)",
+    "paymentSuccess": "Paiement Réussi"
+  },
+  "chat": {
+    "title": "Messages", "typeMessage": "Tapez un message…",
+    "send": "Envoyer", "empty": "Aucun message pour le moment. Dites bonjour !"
+  },
+  "settings": {
+    "language": "Langue", "languageDesc": "Choisissez votre langue",
+    "notifications": "Notifications", "gdprExport": "Exporter Mes Données",
+    "gdprDelete": "Supprimer Mon Compte"
+  }
+}

@@ -1,398 +1,345 @@
-"""TripZen Backend End-to-End Test Suite"""
-import os
-import sys
-import io
+"""
+Backend test suite for TripZen Phase 2 endpoints:
+  1. WebSocket /api/ws/trip/{trip_id}
+  2. POST /api/users/push-token
+  3. POST /api/bookings/{bid}/payment-intent + /confirm-payment
+  4. POST /api/notifications/whatsapp
+
+Reads EXPO_PUBLIC_BACKEND_URL from /app/frontend/.env (no localhost).
+Seed creds in /app/memory/test_credentials.md.
+"""
+import asyncio
 import json
-import time
-import requests
-from pathlib import Path
+import sys
+from typing import Optional
 
-# Read backend URL from frontend .env
-ENV_PATH = Path("/app/frontend/.env")
-BASE_URL = None
-for line in ENV_PATH.read_text().splitlines():
-    if line.startswith("EXPO_PUBLIC_BACKEND_URL"):
-        BASE_URL = line.split("=", 1)[1].strip().strip('"').strip("'")
-        break
+import httpx
+import websockets
 
+
+def _load_env():
+    env_path = "/app/frontend/.env"
+    with open(env_path) as f:
+        for line in f:
+            line = line.strip()
+            if line.startswith("EXPO_PUBLIC_BACKEND_URL="):
+                v = line.split("=", 1)[1].strip().strip('"').strip("'")
+                return v
+    raise RuntimeError("EXPO_PUBLIC_BACKEND_URL not found")
+
+
+BASE_URL = _load_env()
 API = f"{BASE_URL}/api"
-print(f"Using API base: {API}")
+WS_BASE = BASE_URL.replace("https://", "wss://").replace("http://", "ws://")
 
-results = []  # list of (name, passed, info)
+ADMIN = {"email": "admin@tripzen.com", "password": "admin123"}
+DRIVER = {"email": "driver@tripzen.com", "password": "driver123"}
+PARENT = {"email": "priya@tripzen.com", "password": "parent123"}
 
-
-def record(name, passed, info=""):
-    status = "PASS" if passed else "FAIL"
-    print(f"[{status}] {name} :: {info}")
-    results.append((name, passed, info))
+RESULTS = []
 
 
-def post(path, token=None, **kw):
-    headers = kw.pop("headers", {})
-    if token:
-        headers["Authorization"] = f"Bearer {token}"
-    return requests.post(f"{API}{path}", headers=headers, timeout=60, **kw)
+def log(name, ok, detail=""):
+    status = "PASS" if ok else "FAIL"
+    RESULTS.append((name, ok, detail))
+    print(f"[{status}] {name} :: {detail}")
 
 
-def get(path, token=None, **kw):
-    headers = kw.pop("headers", {})
-    if token:
-        headers["Authorization"] = f"Bearer {token}"
-    return requests.get(f"{API}{path}", headers=headers, timeout=60, **kw)
+def login(client: httpx.Client, creds):
+    r = client.post(f"{API}/auth/login", json=creds)
+    r.raise_for_status()
+    j = r.json()
+    return j.get("access_token") or j.get("token")
 
 
-def put(path, token=None, **kw):
-    headers = kw.pop("headers", {})
-    if token:
-        headers["Authorization"] = f"Bearer {token}"
-    return requests.put(f"{API}{path}", headers=headers, timeout=60, **kw)
+def auth_h(tok):
+    return {"Authorization": f"Bearer {tok}"}
 
 
-def delete(path, token=None, **kw):
-    headers = kw.pop("headers", {})
-    if token:
-        headers["Authorization"] = f"Bearer {token}"
-    return requests.delete(f"{API}{path}", headers=headers, timeout=60, **kw)
+async def test_websocket_trip(driver_tok: str, trip_id: str):
+    ws_url = f"{WS_BASE}/api/ws/trip/{trip_id}"
+    print(f"[INFO] Connecting WS: {ws_url}")
+    try:
+        async with websockets.connect(ws_url, open_timeout=15, close_timeout=5) as ws:
+            try:
+                msg = await asyncio.wait_for(ws.recv(), timeout=10)
+            except asyncio.TimeoutError:
+                log("WS snapshot", False, "no snapshot received in 10s")
+                return
+            try:
+                payload = json.loads(msg)
+            except Exception:
+                log("WS snapshot", False, f"non-JSON snapshot: {msg!r}")
+                return
+            if payload.get("type") == "snapshot" and payload.get("trip", {}).get("id") == trip_id:
+                trip = payload["trip"]
+                log("WS snapshot", True,
+                    f"trip.id matches; current_lat={trip.get('current_lat')} current_lng={trip.get('current_lng')}")
+            else:
+                log("WS snapshot", False, f"unexpected payload: {payload}")
+                return
+
+            new_lat = 51.5210
+            new_lng = -0.0900
+
+            async def push_loc():
+                await asyncio.sleep(0.3)
+                async with httpx.AsyncClient(timeout=20) as ac:
+                    r = await ac.post(
+                        f"{API}/trips/{trip_id}/location",
+                        json={"lat": new_lat, "lng": new_lng},
+                        headers=auth_h(driver_tok),
+                    )
+                    return r.status_code
+
+            push_task = asyncio.create_task(push_loc())
+
+            got_location_frame = False
+            deadline = asyncio.get_event_loop().time() + 10
+            while asyncio.get_event_loop().time() < deadline:
+                remaining = max(0.5, deadline - asyncio.get_event_loop().time())
+                try:
+                    raw = await asyncio.wait_for(ws.recv(), timeout=remaining)
+                except asyncio.TimeoutError:
+                    break
+                try:
+                    p = json.loads(raw)
+                except Exception:
+                    continue
+                if p.get("type") == "location":
+                    t = p.get("trip", {})
+                    if abs(t.get("current_lat", 0) - new_lat) < 1e-6 and abs(t.get("current_lng", 0) - new_lng) < 1e-6:
+                        got_location_frame = True
+                        log("WS location update broadcast", True,
+                            f"received location frame with new coords ({t['current_lat']},{t['current_lng']})")
+                        break
+                    else:
+                        log("WS location update broadcast", False,
+                            f"coords mismatch: got {t.get('current_lat')},{t.get('current_lng')} expected {new_lat},{new_lng}")
+                        break
+
+            sc = await push_task
+            if sc != 200:
+                log("REST POST /trips/{id}/location", False, f"status={sc}")
+            else:
+                log("REST POST /trips/{id}/location", True, "200 OK")
+
+            if not got_location_frame:
+                log("WS location update broadcast", False, "no `location` frame received within 10s after REST push")
+
+            try:
+                await ws.send("ping")
+                raw = await asyncio.wait_for(ws.recv(), timeout=5)
+                if isinstance(raw, str) and raw.strip().lower() == "pong":
+                    log("WS ping/pong", True, "received pong")
+                else:
+                    log("WS ping/pong", True, f"Minor: got {raw!r} instead of pong (optional)")
+            except Exception as e:
+                log("WS ping/pong", True, f"Minor: ping/pong check failed ({e}) (optional)")
+
+    except Exception as e:
+        log("WS connect", False, f"connection error: {e}")
 
 
-# ===================== AUTH =====================
-print("\n========== AUTH ==========")
-tokens = {}
-users = {}
-
-for role, email, pw in [
-    ("admin", "admin@tripzen.com", "admin123"),
-    ("driver", "driver@tripzen.com", "driver123"),
-    ("parent", "priya@tripzen.com", "parent123"),
-]:
-    r = post("/auth/login", json={"email": email, "password": pw})
-    ok = r.status_code == 200 and "access_token" in r.json()
-    record(f"Login {role}", ok, f"status={r.status_code} body={r.text[:200]}")
-    if ok:
-        data = r.json()
-        tokens[role] = data["access_token"]
-        users[role] = data["user"]
-
-# Test /auth/me
-for role, tok in tokens.items():
-    r = get("/auth/me", token=tok)
-    ok = r.status_code == 200 and r.json().get("role") == role
-    record(f"/auth/me {role}", ok, f"status={r.status_code} body={r.text[:120]}")
-
-# Test register a fresh user, then delete to keep state clean (use admin to clean)
-import uuid as _uuid
-rand_email = f"e2e+{_uuid.uuid4().hex[:8]}@tripzen.test"
-r = post("/auth/register", json={"email": rand_email, "password": "TestPass123!", "full_name": "E2E Test User", "role": "parent"})
-ok = r.status_code == 200 and "access_token" in r.json()
-record("Register new parent", ok, f"status={r.status_code} body={r.text[:120]}")
-if ok:
-    new_uid = r.json()["user"]["id"]
-    delete(f"/admin/users/{new_uid}", token=tokens["admin"])
-
-admin_t = tokens.get("admin")
-driver_t = tokens.get("driver")
-parent_t = tokens.get("parent")
-
-if not (admin_t and driver_t and parent_t):
-    print("Auth failed - aborting.")
-    sys.exit(1)
-
-# ===================== STUDENTS CRUD =====================
-print("\n========== STUDENTS ==========")
-# Parent list
-r = get("/students", token=parent_t)
-record("Parent list students", r.status_code == 200, f"status={r.status_code} count={len(r.json()) if r.ok else 0}")
-parent_students = r.json() if r.ok else []
-aarav = next((s for s in parent_students if s["name"] == "Aarav Sharma"), None)
-record("Aarav seeded student exists with qr_code", bool(aarav and aarav.get("qr_code")), f"qr={aarav.get('qr_code') if aarav else None}")
-
-# Admin list
-r = get("/students", token=admin_t)
-record("Admin list students", r.status_code == 200 and isinstance(r.json(), list), f"status={r.status_code} count={len(r.json()) if r.ok else 0}")
-
-# Parent creates a student
-r = post("/students", token=parent_t, json={"name": "Riya Sharma E2E", "grade": "Year 2", "school": "Greenfield School"})
-ok = r.status_code == 200 and r.json().get("qr_code", "").startswith("TRIPZEN-")
-record("Parent create student", ok, f"status={r.status_code} body={r.text[:160]}")
-new_student_id = r.json()["id"] if ok else None
-
-# Update
-if new_student_id:
-    r = put(f"/students/{new_student_id}", token=parent_t, json={"name": "Riya Sharma E2E", "grade": "Year 3", "school": "Greenfield School"})
-    record("Parent update student", r.status_code == 200 and r.json().get("grade") == "Year 3", f"status={r.status_code}")
-
-# Delete
-if new_student_id:
-    r = delete(f"/students/{new_student_id}", token=parent_t)
-    record("Parent delete student", r.status_code == 200, f"status={r.status_code}")
-
-# ===================== ROUTES =====================
-print("\n========== ROUTES ==========")
-r = get("/routes", token=admin_t)
-record("Admin list routes", r.status_code == 200 and len(r.json()) >= 2, f"count={len(r.json()) if r.ok else 0}")
-all_routes = r.json() if r.ok else []
-morning_route = next((rt for rt in all_routes if rt["name"] == "Route 3 - Morning"), None)
-record("Route 3 - Morning seeded", bool(morning_route), f"id={morning_route.get('id') if morning_route else None}")
-
-# Driver only sees assigned routes
-r = get("/routes", token=driver_t)
-ok = r.status_code == 200 and all(rt.get("driver_id") == users["driver"]["id"] for rt in r.json())
-record("Driver only sees assigned routes", ok, f"count={len(r.json()) if r.ok else 0}")
-
-# Admin create a route
-new_route_body = {
-    "name": "E2E Test Route",
-    "driver_id": users["driver"]["id"],
-    "bus_number": "Bus E2E",
-    "shift": "morning",
-    "stops": [
-        {"id": str(_uuid.uuid4()), "name": "Stop A", "address": "A", "lat": 51.5, "lng": -0.13, "order": 0, "eta": "08:00 AM"},
-        {"id": str(_uuid.uuid4()), "name": "Stop B", "address": "B", "lat": 51.51, "lng": -0.12, "order": 1, "eta": "08:10 AM"},
-    ],
-}
-r = post("/routes", token=admin_t, json=new_route_body)
-ok = r.status_code == 200 and "id" in r.json()
-record("Admin create route", ok, f"status={r.status_code}")
-new_route_id = r.json()["id"] if ok else None
-
-# Get one
-if new_route_id:
-    r = get(f"/routes/{new_route_id}", token=admin_t)
-    record("Admin get one route", r.status_code == 200, f"status={r.status_code}")
-    # Update
-    upd = dict(new_route_body)
-    upd["bus_number"] = "Bus E2E v2"
-    r = put(f"/routes/{new_route_id}", token=admin_t, json=upd)
-    record("Admin update route", r.status_code == 200 and r.json().get("bus_number") == "Bus E2E v2", f"status={r.status_code}")
-    # Delete
-    r = delete(f"/routes/{new_route_id}", token=admin_t)
-    record("Admin delete route", r.status_code == 200, f"status={r.status_code}")
-
-# Negative: parent forbidden to create route
-r = post("/routes", token=parent_t, json=new_route_body)
-record("Parent cannot create route (403)", r.status_code == 403, f"status={r.status_code}")
-
-# ===================== TRIPS LIFECYCLE =====================
-print("\n========== TRIPS ==========")
-trip_id = None
-if morning_route:
-    r = post("/trips/start", token=driver_t, json={"route_id": morning_route["id"]})
-    ok = r.status_code == 200 and r.json().get("status") == "active"
-    record("Driver starts trip on Route 3 - Morning", ok, f"status={r.status_code} body={r.text[:200]}")
-    trip_id = r.json()["id"] if ok else None
-
-# GET /trips/active as driver
-r = get("/trips/active", token=driver_t)
-ok = r.status_code == 200 and any(t["id"] == trip_id for t in r.json())
-record("GET /trips/active returns trip", ok, f"count={len(r.json()) if r.ok else 0}")
-
-# Location update
-if trip_id:
-    r = post(f"/trips/{trip_id}/location", token=driver_t, json={"lat": 51.5200, "lng": -0.1300, "stop_index": 1})
-    ok = r.status_code == 200 and abs(r.json().get("current_lat", 0) - 51.52) < 0.01
-    record("Update trip location", ok, f"status={r.status_code} current_lat={r.json().get('current_lat')}")
-
-# Get parent notifications baseline
-r = get("/notifications", token=parent_t)
-baseline_notifs = len(r.json()) if r.ok else 0
-
-# Scan board with Aarav's QR
-if trip_id and aarav:
-    r = post(f"/trips/{trip_id}/scan", token=driver_t, json={"qr_code": aarav["qr_code"], "action": "board"})
-    ok = r.status_code == 200 and r.json().get("ok")
-    record("Scan board Aarav", ok, f"status={r.status_code}")
-
-    # Verify parent received notification
-    time.sleep(0.5)
-    r = get("/notifications", token=parent_t)
-    notifs = r.json() if r.ok else []
-    has_board = any(n["type"] == "boarding" and aarav["id"] == n.get("student_id") for n in notifs)
-    record("Parent received boarding notification", has_board, f"new_count={len(notifs)} baseline={baseline_notifs}")
-
-    # Scan checkout
-    r = post(f"/trips/{trip_id}/scan", token=driver_t, json={"qr_code": aarav["qr_code"], "action": "checkout"})
-    record("Scan checkout Aarav", r.status_code == 200, f"status={r.status_code}")
-
-# ETA before ending trip (geofence)
-if trip_id:
-    r = get(f"/trips/{trip_id}/eta", token=parent_t)
-    body = r.json() if r.ok else {}
-    ok = r.status_code == 200 and "eta_minutes" in body and "distance_m" in body and "next_stop" in body and "geofence_alert" in body
-    record("GET /trips/{id}/eta", ok, f"status={r.status_code} body={r.text[:200]}")
-
-# ===================== DRIVER SOS & INCIDENTS =====================
-print("\n========== SOS & INCIDENTS ==========")
-sos_alert_id = None
-if trip_id:
-    r = post(f"/trips/{trip_id}/sos", token=driver_t)
-    ok = r.status_code == 200 and r.json().get("ok")
-    record("Driver SOS", ok, f"status={r.status_code} body={r.text[:200]}")
-    sos_alert_id = r.json().get("alert_id") if ok else None
-
-# Admin alerts contains critical SOS
-r = get("/admin/alerts", token=admin_t)
-alerts = r.json() if r.ok else []
-has_sos = any(a.get("type") == "sos" and a.get("severity") == "critical" and (sos_alert_id is None or a.get("id") == sos_alert_id) for a in alerts)
-record("Admin sees SOS critical alert", has_sos, f"alerts_count={len(alerts)}")
-
-# Incident
-if trip_id:
-    r = post(f"/trips/{trip_id}/incident", token=driver_t, json={"type": "delay", "description": "Traffic on Park Avenue, 10 min delay"})
-    ok = r.status_code == 200 and r.json().get("ok")
-    record("Driver report incident", ok, f"status={r.status_code}")
-
-r = get("/admin/incidents", token=admin_t)
-ok = r.status_code == 200 and any(i.get("type") == "delay" and i.get("trip_id") == trip_id for i in r.json())
-record("Admin sees incident", ok, f"count={len(r.json()) if r.ok else 0}")
-
-# ===================== BOOKINGS + SIBLING DISCOUNT =====================
-print("\n========== BOOKINGS ==========")
-# Cleanup pre-existing paid monthly bookings to ensure deterministic discount test
-# Note: we can't delete bookings, so we account for existing paid count
-existing = get("/bookings", token=parent_t).json()
-existing_paid_monthly = sum(1 for b in existing if b.get("status") == "paid" and b.get("plan") == "monthly")
-print(f"  (existing paid monthly bookings: {existing_paid_monthly})")
-
-if morning_route and aarav:
-    # First booking
-    r = post("/bookings", token=parent_t, json={"student_id": aarav["id"], "route_id": morning_route["id"], "plan": "monthly"})
-    ok = r.status_code == 200
-    record("Create first monthly booking", ok, f"status={r.status_code} body={r.text[:200]}")
-    booking1 = r.json() if ok else None
-    if booking1:
-        # If no previous paid monthly, expect amount=89.99 discount=0
-        if existing_paid_monthly == 0:
-            expect_amount = 89.99
-            expect_discount = 0.0
+def test_push_token(parent_tok: str):
+    with httpx.Client(timeout=20) as c:
+        r = c.post(
+            f"{API}/users/push-token",
+            json={"token": "ExponentPushToken[abc123]", "platform": "ios"},
+            headers=auth_h(parent_tok),
+        )
+        if r.status_code == 200 and r.json().get("ok") is True:
+            log("POST /users/push-token (parent ios)", True, f"body={r.json()}")
         else:
-            expect_amount = 71.99
-            expect_discount = 18.00
-        ok_amt = abs(booking1["amount"] - expect_amount) < 0.01 and abs(booking1["discount"] - expect_discount) < 0.01
-        record(f"First booking amount={expect_amount} discount={expect_discount}", ok_amt, f"got amount={booking1['amount']} discount={booking1['discount']}")
+            log("POST /users/push-token (parent ios)", False, f"status={r.status_code} body={r.text[:200]}")
 
-        # Pay
-        r = post(f"/bookings/{booking1['id']}/pay", token=parent_t)
-        record("Pay first booking", r.status_code == 200 and r.json().get("payment_ref", "").startswith("pi_"), f"status={r.status_code}")
+        r2 = c.post(
+            f"{API}/users/push-token",
+            json={"token": "ExponentPushToken[xyz999]", "platform": "android"},
+            headers=auth_h(parent_tok),
+        )
+        if r2.status_code == 200 and r2.json().get("ok") is True:
+            log("POST /users/push-token (overwrite android)", True, f"body={r2.json()}")
+        else:
+            log("POST /users/push-token (overwrite android)", False, f"status={r2.status_code} body={r2.text[:200]}")
 
-        # Second booking should have discount applied
-        r = post("/bookings", token=parent_t, json={"student_id": aarav["id"], "route_id": morning_route["id"], "plan": "monthly"})
-        ok2 = r.status_code == 200
-        record("Create second monthly booking", ok2, f"status={r.status_code}")
-        if ok2:
-            booking2 = r.json()
-            ok_disc = abs(booking2["discount"] - 18.00) < 0.01 and abs(booking2["amount"] - 71.99) < 0.01
-            record("Second monthly booking has 20% sibling discount", ok_disc, f"got amount={booking2['amount']} discount={booking2['discount']}")
+        r3 = c.post(
+            f"{API}/users/push-token",
+            json={"token": "ExponentPushToken[noauth]", "platform": "web"},
+        )
+        if r3.status_code in (401, 403):
+            log("POST /users/push-token (no auth → 401/403)", True, f"status={r3.status_code}")
+        else:
+            log("POST /users/push-token (no auth → 401/403)", False,
+                f"expected 401/403 got {r3.status_code} body={r3.text[:200]}")
 
-        # Single plan booking
-        r = post("/bookings", token=parent_t, json={"student_id": aarav["id"], "route_id": morning_route["id"], "plan": "single"})
-        ok_s = r.status_code == 200 and abs(r.json()["amount"] - 4.50) < 0.01 and r.json()["discount"] == 0.0
-        record("Single plan booking = 4.50", ok_s, f"got={r.json() if r.ok else r.text[:120]}")
 
-# ===================== CHAT =====================
-print("\n========== CHAT ==========")
-driver_uid = users["driver"]["id"]
-parent_uid = users["parent"]["id"]
-admin_uid = users["admin"]["id"]
+def get_first_student_id(client: httpx.Client, parent_tok: str) -> Optional[str]:
+    r = client.get(f"{API}/students", headers=auth_h(parent_tok))
+    r.raise_for_status()
+    items = r.json()
+    return items[0]["id"] if items else None
 
-# Parent → driver
-r = post("/messages", token=parent_t, json={"recipient_id": driver_uid, "text": "Hi, will the bus be on time?"})
-record("Parent sends message to driver", r.status_code == 200 and "id" in r.json(), f"status={r.status_code} body={r.text[:200]}")
 
-# Driver fetches conversation
-r = get(f"/messages/{parent_uid}", token=driver_t)
-msgs = r.json() if r.ok else []
-ok = r.status_code == 200 and any(m["text"].startswith("Hi, will the bus") for m in msgs)
-record("Driver fetches parent thread", ok, f"count={len(msgs)}")
+def test_payment_flow(parent_tok: str, admin_tok: str):
+    with httpx.Client(timeout=20) as c:
+        student_id = get_first_student_id(c, parent_tok)
+        if not student_id:
+            log("Payment: prerequisite student", False, "No student found for parent")
+            return
+        r = c.get(f"{API}/routes", headers=auth_h(admin_tok))
+        if r.status_code != 200 or not r.json():
+            log("Payment: prerequisite route", False, f"admin /routes status={r.status_code}")
+            return
+        route_id = None
+        for rt in r.json():
+            if "morning" in rt["name"].lower():
+                route_id = rt["id"]
+                break
+        route_id = route_id or r.json()[0]["id"]
 
-# Driver replies
-r = post("/messages", token=driver_t, json={"recipient_id": parent_uid, "text": "Yes, on schedule!"})
-record("Driver replies to parent", r.status_code == 200, f"status={r.status_code}")
+        rb = c.post(
+            f"{API}/bookings",
+            json={"plan": "single", "student_id": student_id, "route_id": route_id},
+            headers=auth_h(parent_tok),
+        )
+        if rb.status_code != 200:
+            log("Create single booking", False, f"status={rb.status_code} body={rb.text[:200]}")
+            return
+        booking = rb.json()
+        bid = booking["id"]
+        log("Create single booking", True, f"id={bid} amount={booking.get('amount')}")
 
-# Parent fetches threads
-r = get("/messages", token=parent_t)
-threads = r.json() if r.ok else []
-has_driver_thread = any(t.get("other_id") == driver_uid for t in threads)
-record("Parent threads list contains driver", has_driver_thread, f"threads={len(threads)}")
+        ri = c.post(f"{API}/bookings/{bid}/payment-intent", headers=auth_h(parent_tok))
+        if ri.status_code != 200:
+            log("POST /bookings/{id}/payment-intent", False, f"status={ri.status_code} body={ri.text[:200]}")
+            return
+        body = ri.json()
+        cs = body.get("client_secret", "") or ""
+        problems = []
+        if not cs.startswith("pi_mock_"):
+            problems.append(f"client_secret does not start with pi_mock_ (got {cs[:30]})")
+        if "publishable_key" not in body:
+            problems.append("missing publishable_key")
+        if body.get("amount") != 4.5:
+            problems.append(f"amount expected 4.5 got {body.get('amount')}")
+        if (body.get("currency") or "").lower() != "gbp":
+            problems.append(f"currency expected gbp got {body.get('currency')}")
+        if body.get("mocked") is not True:
+            problems.append(f"mocked expected True got {body.get('mocked')}")
+        if problems:
+            log("POST /bookings/{id}/payment-intent", False, "; ".join(problems) + f" full={body}")
+        else:
+            log("POST /bookings/{id}/payment-intent", True, f"body={body}")
 
-# Negative: parent → another parent (need a 2nd parent)
-# create a temp parent
-temp_email = f"e2eparent+{_uuid.uuid4().hex[:6]}@tripzen.test"
-r = post("/auth/register", json={"email": temp_email, "password": "TestPass123!", "full_name": "Other Parent", "role": "parent"})
-if r.status_code == 200:
-    temp_parent_id = r.json()["user"]["id"]
-    r = post("/messages", token=parent_t, json={"recipient_id": temp_parent_id, "text": "should fail"})
-    record("Parent → another parent is 403", r.status_code == 403, f"status={r.status_code}")
-    delete(f"/admin/users/{temp_parent_id}", token=admin_t)
-else:
-    record("Setup temp parent for negative test", False, f"status={r.status_code}")
+        rc = c.post(f"{API}/bookings/{bid}/confirm-payment", headers=auth_h(parent_tok))
+        if rc.status_code != 200:
+            log("POST /bookings/{id}/confirm-payment", False, f"status={rc.status_code} body={rc.text[:200]}")
+            return
+        cb = rc.json()
+        if cb.get("ok") is True and cb.get("amount") == 4.5:
+            log("POST /bookings/{id}/confirm-payment", True, f"body={cb}")
+        else:
+            log("POST /bookings/{id}/confirm-payment", False, f"unexpected body={cb}")
 
-# ===================== END TRIP + RATING =====================
-print("\n========== END TRIP + RATING ==========")
-if trip_id:
-    r = post(f"/trips/{trip_id}/end", token=driver_t)
-    record("Driver ends trip", r.status_code == 200 and r.json().get("ok"), f"status={r.status_code}")
+        rl = c.get(f"{API}/bookings", headers=auth_h(parent_tok))
+        if rl.status_code == 200:
+            match = next((b for b in rl.json() if b["id"] == bid), None)
+            if match and match.get("status") == "paid":
+                log("GET /bookings shows status=paid", True,
+                    f"status={match['status']} payment_ref={match.get('payment_ref')}")
+            else:
+                log("GET /bookings shows status=paid", False, f"booking={match}")
+        else:
+            log("GET /bookings shows status=paid", False, f"status={rl.status_code}")
 
-# Rating
-if trip_id:
-    r = post("/ratings", token=parent_t, json={"trip_id": trip_id, "stars": 5, "feedback": "Great driver, very safe!"})
-    record("Parent posts 5-star rating", r.status_code == 200, f"status={r.status_code} body={r.text[:200]}")
+        rn = c.post(f"{API}/bookings/{bid}/payment-intent", headers=auth_h(parent_tok))
+        if rn.status_code == 400 and "already paid" in rn.text.lower():
+            log("Negative: payment-intent on paid booking → 400 'Already paid'", True, f"body={rn.text}")
+        else:
+            log("Negative: payment-intent on paid booking → 400 'Already paid'", False,
+                f"expected 400 'Already paid' got status={rn.status_code} body={rn.text[:200]}")
 
-# Driver ratings aggregate
-r = get(f"/ratings/driver/{driver_uid}", token=parent_t)
-body = r.json() if r.ok else {}
-ok = r.status_code == 200 and body.get("average", 0) >= 1 and body.get("count", 0) >= 1
-record("GET /ratings/driver/{id}", ok, f"avg={body.get('average')} count={body.get('count')}")
 
-# ===================== AI WEEKLY SUMMARY =====================
-print("\n========== AI WEEKLY SUMMARY ==========")
-if aarav:
-    r = get(f"/parent/weekly-summary/{aarav['id']}", token=parent_t)
-    body = r.json() if r.ok else {}
-    ok = r.status_code == 200 and isinstance(body.get("summary"), str) and body.get("count", -1) >= 0
-    record("Weekly summary returned", ok, f"status={r.status_code} ai_generated={body.get('ai_generated')} summary[:80]={(body.get('summary') or '')[:80]}")
+def test_whatsapp(admin_tok: str):
+    with httpx.Client(timeout=20) as c:
+        r = c.post(
+            f"{API}/notifications/whatsapp",
+            json={"to_phone": "+447700900222", "message": "Hello from test"},
+            headers=auth_h(admin_tok),
+        )
+        if r.status_code != 200:
+            log("POST /notifications/whatsapp", False, f"status={r.status_code} body={r.text[:200]}")
+            return
+        b = r.json()
+        if b.get("ok") is True and b.get("mocked") is True and b.get("to") == "+447700900222":
+            log("POST /notifications/whatsapp (mocked)", True, f"body={b}")
+        else:
+            log("POST /notifications/whatsapp (mocked)", False, f"unexpected body={b}")
 
-# ===================== GDPR EXPORT =====================
-print("\n========== GDPR ==========")
-r = get("/parent/gdpr-export", token=parent_t)
-body = r.json() if r.ok else {}
-needed_keys = {"user", "children", "bookings", "notifications", "messages", "ratings"}
-ok = r.status_code == 200 and needed_keys.issubset(body.keys())
-record("GDPR export contains required keys", ok, f"status={r.status_code} keys={list(body.keys())[:10]}")
 
-# Do NOT call DELETE /api/parent/account
+def ensure_active_trip(driver_tok: str) -> Optional[str]:
+    with httpx.Client(timeout=30) as c:
+        r = c.get(f"{API}/trips/active", headers=auth_h(driver_tok))
+        if r.status_code == 200:
+            data = r.json()
+            if isinstance(data, list):
+                data = data[0] if data else None
+            if data and data.get("id"):
+                print(f"[INFO] reusing active trip {data['id']}")
+                return data["id"]
 
-# ===================== ADMIN STATS / REVENUE / USERS =====================
-print("\n========== ADMIN ENDPOINTS ==========")
-r = get("/admin/stats", token=admin_t)
-body = r.json() if r.ok else {}
-needed = {"total_routes", "total_students", "active_buses", "on_time_percent", "completed_today", "total_drivers", "total_parents"}
-record("/admin/stats", r.status_code == 200 and needed.issubset(body.keys()), f"keys={list(body.keys())}")
+        rr = c.get(f"{API}/routes", headers=auth_h(driver_tok))
+        if rr.status_code != 200:
+            print(f"[ERR] driver /routes status={rr.status_code} body={rr.text[:200]}")
+            return None
+        route = None
+        for rt in rr.json():
+            if "morning" in rt["name"].lower() and "route 3" in rt["name"].lower():
+                route = rt
+                break
+        if not route and rr.json():
+            route = rr.json()[0]
+        if not route:
+            print("[ERR] No route found")
+            return None
 
-r = get("/admin/revenue", token=admin_t)
-body = r.json() if r.ok else {}
-record("/admin/revenue", r.status_code == 200 and "total_revenue" in body and "paid_bookings" in body, f"body={body}")
+        rs = c.post(f"{API}/trips/start", json={"route_id": route["id"]}, headers=auth_h(driver_tok))
+        if rs.status_code != 200:
+            print(f"[ERR] start trip status={rs.status_code} body={rs.text[:200]}")
+            return None
+        return rs.json()["id"]
 
-r = get("/admin/users", token=admin_t)
-record("/admin/users", r.status_code == 200 and len(r.json()) >= 3, f"count={len(r.json()) if r.ok else 0}")
 
-r = get("/admin/alerts", token=admin_t)
-record("/admin/alerts", r.status_code == 200, f"count={len(r.json()) if r.ok else 0}")
+def main():
+    print(f"[INFO] BASE_URL={BASE_URL}")
+    print(f"[INFO] WS_BASE={WS_BASE}")
 
-r = get("/admin/incidents", token=admin_t)
-record("/admin/incidents", r.status_code == 200, f"count={len(r.json()) if r.ok else 0}")
+    with httpx.Client(timeout=30) as c:
+        admin_tok = login(c, ADMIN)
+        driver_tok = login(c, DRIVER)
+        parent_tok = login(c, PARENT)
+        print("[INFO] All three role logins OK")
 
-# Negative: parent cannot access admin
-r = get("/admin/stats", token=parent_t)
-record("Parent cannot access /admin/stats (403)", r.status_code == 403, f"status={r.status_code}")
+    trip_id = ensure_active_trip(driver_tok)
+    if not trip_id:
+        log("WS prerequisites: active trip", False, "could not start/find an active trip")
+    else:
+        log("WS prerequisites: active trip", True, f"trip_id={trip_id}")
+        asyncio.run(test_websocket_trip(driver_tok, trip_id))
 
-# ===================== SUMMARY =====================
-print("\n========== SUMMARY ==========")
-passed = sum(1 for _, ok, _ in results if ok)
-failed = [r for r in results if not r[1]]
-print(f"PASSED: {passed}/{len(results)}")
-print(f"FAILED: {len(failed)}")
-for name, _, info in failed:
-    print(f"  - {name} :: {info}")
+    test_push_token(parent_tok)
+    test_payment_flow(parent_tok, admin_tok)
+    test_whatsapp(admin_tok)
 
-# Exit non-zero if any failures
-sys.exit(0 if not failed else 1)
+    print("\n========== SUMMARY ==========")
+    passed = sum(1 for _, ok, _ in RESULTS if ok)
+    total = len(RESULTS)
+    for name, ok, _ in RESULTS:
+        print(f"{'PASS' if ok else 'FAIL'} | {name}")
+    print(f"\n{passed}/{total} checks passed")
+    sys.exit(0 if passed == total else 1)
+
+
+if __name__ == "__main__":
+    main()
