@@ -1,0 +1,50 @@
+{
+  "summary": "Iteration 2 testing: Backend pytest now 41/41 (24 regression + 17 NEW admin CRUD) = 100%. All new admin endpoints (PUT/DELETE routes & students, GET/POST/DELETE /admin/users, GET /admin/revenue) and RBAC (403 for parent/driver) work as specified. Frontend: all 4 new admin screens (routes, students, drivers, bookings) load when reached via Account menu items, list seeded data correctly, show + Add button. Manage Routes create flow validated end-to-end (TEST_UI_Route3 created via UI -> appeared in list -> deleted via API). Back buttons return to /admin (Account screen) correctly. Regression: all 3 demo logins (admin/driver/parent) and Admin Overview still work. NOTE: After deploying new screen files Metro had to be restarted (sudo supervisorctl restart expo) because Fast Resolver / CI-mode bundle did not pick up the four new files automatically — until that restart, /admin/routes /admin/students /admin/drivers /admin/bookings all rendered the 'Unmatched Route' fallback. Worth flagging so user / main agent knows to restart Expo after adding new route files.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {
+        "screen": "global",
+        "issues": [
+          "Expo warning persists: 'shadow* style props are deprecated. Use boxShadow.' Non-blocking."
+        ]
+      }
+    ],
+    "react_native_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_admin_crud.py",
+    "/app/backend/tests/test_tripzen_api.py",
+    "/app/test_reports/pytest/pytest_results.xml"
+  ],
+  "action_items": [
+    "(Informational) When adding new screen files under app/, sudo supervisorctl restart expo is required for Metro to pick them up. No code change needed.",
+    "(Carried over from iteration 1) Sign Out on react-native-web still uses Alert.alert with multi-button — main agent stated it was migrated to a confirm-less async handler, please re-verify in production build. (Not re-tested visually this round because focus was admin CRUD.)",
+    "(Optional) Migrate deprecated shadow* style props to boxShadow."
+  ],
+  "critical_code_review_comments": [
+    "server.py admin CRUD additions are clean: proper require_roles('admin') guards, $inc for student_count maintenance on route changes, self-delete protection (400), duplicate-email guard (400), password_hash excluded from /admin/users via projection.",
+    "DELETE /api/routes/{id} correctly nullifies route_id on associated students via update_many — verified by test.",
+    "PUT /api/students/{id} correctly transfers student_count between old & new routes — verified by test.",
+    "GET /api/admin/revenue uses a clean aggregation pipeline (status=paid), returns total/count/pending/currency. Currency hardcoded 'GBP' is consistent with PRICE_MAP.",
+    "Frontend admin screens use testID consistently, expo-router router.push for nav, modal forms, and confirm() helper for delete on web — solid pattern.",
+    "Minor: _layout.tsx uses href:null for the 4 hidden screens; this only hides the tab, the routes are still reachable via router.push as proven by tests. OK."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_admin_crud.py (NEW — 17 pytest cases for admin CRUD + revenue + RBAC + parent self-update)"
+  ],
+  "success_rate": {
+    "backend": "100% (41/41)",
+    "frontend": "100% for tested admin flows (4 new screens load, create-route flow validated, back nav works, 3-role login regression OK)"
+  },
+  "seed_data_creation": "No persistent seed data added. Tests create TEST_-prefixed routes/students/users and clean them up after each test. One TEST_UI_Route3 was created via UI during validation and was deleted via API afterwards.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Backend admin CRUD endpoints are 100% green and frontend admin management screens render & integrate correctly after expo restart. Sign-out re-verification on web is the only open item carried from iteration 1. Demo accounts: admin@tripzen.com/admin123, driver@tripzen.com/driver123, priya@tripzen.com/parent123. Aarav student QR is TRIPZEN-17304D76. Important: if you add new route files under /app/frontend/app/, run 'sudo supervisorctl restart expo' to force Metro to bundle them, otherwise you'll see 'Unmatched Route' for those URLs.",
+  "rca_of_issue": "Initial 'Unmatched Route' on /admin/{routes,students,drivers,bookings} was NOT a code bug — server.py and the new tsx files were correct. Root cause: Metro is started with CI=true (reloads disabled) so newly created files were not added to the bundle. Reproduction: add a new app/foo.tsx, browse to /foo → Unmatched Route. Mitigation: run 'sudo supervisorctl restart expo' (or remove CI=true to enable watch mode). After restart all 4 screens loaded, list/create flows worked, back navigation returned to /admin Account."
+}

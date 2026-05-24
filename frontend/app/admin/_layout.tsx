@@ -60,6 +60,10 @@ export default function AdminLayout() {
           tabBarIcon: ({ color }) => <Ionicons name="person" size={22} color={color} />,
         }}
       />
+      <Tabs.Screen name="routes" options={{ href: null }} />
+      <Tabs.Screen name="students" options={{ href: null }} />
+      <Tabs.Screen name="drivers" options={{ href: null }} />
+      <Tabs.Screen name="bookings" options={{ href: null }} />
     </Tabs>
   );
 }

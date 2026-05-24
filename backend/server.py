@@ -318,6 +318,38 @@ async def _get_first_parent_id() -> str:
     return p["id"] if p else "unknown"
 
 
+@api.put("/students/{sid}")
+async def update_student(sid: str, body: StudentCreate, user: dict = Depends(get_current_user)):
+    existing = await db.students.find_one({"id": sid}, {"_id": 0})
+    if not existing:
+        raise HTTPException(404, "Student not found")
+    if user["role"] == "parent" and existing.get("parent_id") != user["id"]:
+        raise HTTPException(403, "Forbidden")
+    old_route = existing.get("route_id")
+    upd = body.dict(exclude_unset=True)
+    await db.students.update_one({"id": sid}, {"$set": upd})
+    new_route = upd.get("route_id", old_route)
+    if old_route != new_route:
+        if old_route:
+            await db.routes.update_one({"id": old_route}, {"$inc": {"student_count": -1}})
+        if new_route:
+            await db.routes.update_one({"id": new_route}, {"$inc": {"student_count": 1}})
+    return await db.students.find_one({"id": sid}, {"_id": 0})
+
+
+@api.delete("/students/{sid}")
+async def delete_student(sid: str, user: dict = Depends(get_current_user)):
+    existing = await db.students.find_one({"id": sid}, {"_id": 0})
+    if not existing:
+        raise HTTPException(404, "Student not found")
+    if user["role"] == "parent" and existing.get("parent_id") != user["id"]:
+        raise HTTPException(403, "Forbidden")
+    await db.students.delete_one({"id": sid})
+    if existing.get("route_id"):
+        await db.routes.update_one({"id": existing["route_id"]}, {"$inc": {"student_count": -1}})
+    return {"ok": True}
+
+
 # ----- Routes -----
 @api.get("/routes")
 async def list_routes(user: dict = Depends(get_current_user)):
@@ -345,6 +377,24 @@ async def get_route(route_id: str, user: dict = Depends(get_current_user)):
     if not route:
         raise HTTPException(404, "Route not found")
     return route
+
+
+@api.put("/routes/{route_id}")
+async def update_route(route_id: str, body: RouteCreate, user: dict = Depends(require_roles("admin"))):
+    upd = body.dict(exclude_unset=True)
+    res = await db.routes.update_one({"id": route_id}, {"$set": upd})
+    if res.matched_count == 0:
+        raise HTTPException(404, "Route not found")
+    return await db.routes.find_one({"id": route_id}, {"_id": 0})
+
+
+@api.delete("/routes/{route_id}")
+async def delete_route(route_id: str, user: dict = Depends(require_roles("admin"))):
+    res = await db.routes.delete_one({"id": route_id})
+    if res.deleted_count == 0:
+        raise HTTPException(404, "Route not found")
+    await db.students.update_many({"route_id": route_id}, {"$set": {"route_id": None}})
+    return {"ok": True}
 
 
 # ----- Trips -----
@@ -558,6 +608,53 @@ async def admin_alerts(user: dict = Depends(require_roles("admin"))):
 async def list_users(user: dict = Depends(require_roles("admin"))):
     cursor = db.users.find({}, {"_id": 0, "password_hash": 0})
     return await cursor.to_list(1000)
+
+
+@api.post("/admin/users")
+async def create_user_admin(body: UserCreate, user: dict = Depends(require_roles("admin"))):
+    existing = await db.users.find_one({"email": body.email.lower()})
+    if existing:
+        raise HTTPException(400, "Email already exists")
+    uid = str(uuid.uuid4())
+    doc = {
+        "id": uid,
+        "email": body.email.lower(),
+        "full_name": body.full_name,
+        "role": body.role,
+        "phone": body.phone,
+        "password_hash": hash_password(body.password),
+        "created_at": now_iso(),
+    }
+    await db.users.insert_one(doc)
+    return {k: v for k, v in doc.items() if k != "_id" and k != "password_hash"}
+
+
+@api.delete("/admin/users/{uid}")
+async def delete_user_admin(uid: str, user: dict = Depends(require_roles("admin"))):
+    if uid == user["id"]:
+        raise HTTPException(400, "Cannot delete yourself")
+    res = await db.users.delete_one({"id": uid})
+    if res.deleted_count == 0:
+        raise HTTPException(404, "User not found")
+    return {"ok": True}
+
+
+@api.get("/admin/revenue")
+async def admin_revenue(user: dict = Depends(require_roles("admin"))):
+    pipeline = [
+        {"$match": {"status": "paid"}},
+        {"$group": {"_id": None, "total": {"$sum": "$amount"}, "count": {"$sum": 1}}},
+    ]
+    res = await db.bookings.aggregate(pipeline).to_list(1)
+    total = res[0]["total"] if res else 0
+    count = res[0]["count"] if res else 0
+    pending = await db.bookings.count_documents({"status": "pending"})
+    return {
+        "total_revenue": round(total, 2),
+        "paid_bookings": count,
+        "pending_bookings": pending,
+        "currency": "GBP",
+    }
 
 
 # ----- Health -----

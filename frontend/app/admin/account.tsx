@@ -35,10 +35,10 @@ export default function AdminAccount() {
         </View>
 
         <Text style={styles.section}>Management</Text>
-        <Menu icon="bus" label="Manage Routes" testID="a-menu-routes" />
-        <Menu icon="people" label="Manage Students" testID="a-menu-students" />
-        <Menu icon="car-sport" label="Manage Drivers" testID="a-menu-drivers" />
-        <Menu icon="receipt" label="Bookings & Revenue" testID="a-menu-bookings" />
+        <Menu icon="bus" label="Manage Routes" testID="a-menu-routes" onPress={() => router.push("/admin/routes")} />
+        <Menu icon="people" label="Manage Students" testID="a-menu-students" onPress={() => router.push("/admin/students")} />
+        <Menu icon="car-sport" label="Manage Drivers" testID="a-menu-drivers" onPress={() => router.push("/admin/drivers")} />
+        <Menu icon="receipt" label="Bookings & Revenue" testID="a-menu-bookings" onPress={() => router.push("/admin/bookings")} />
 
         <Text style={styles.section}>Settings</Text>
         <Menu icon="shield-checkmark" label="Compliance & GDPR" testID="a-menu-compliance" />
@@ -60,9 +60,9 @@ export default function AdminAccount() {
   );
 }
 
-function Menu({ icon, label, testID }: any) {
+function Menu({ icon, label, testID, onPress }: any) {
   return (
-    <TouchableOpacity testID={testID} style={styles.menuItem} activeOpacity={0.7}>
+    <TouchableOpacity testID={testID} style={styles.menuItem} activeOpacity={0.7} onPress={onPress}>
       <View style={styles.menuIcon}>
         <Ionicons name={icon} size={18} color={COLORS.primary} />
       </View>
