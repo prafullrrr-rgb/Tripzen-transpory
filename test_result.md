@@ -588,6 +588,16 @@ agent_communication:
       All 4 in-scope phase-2 tasks are green; no critical issues.
   - agent: "testing"
     message: |
+      Support contact endpoint quick verification (GET /api/support/contact):
+        ✅ Parent (priya) → 200, contact={id, full_name:"TripZen Admin", email:"admin@tripzen.com", role:"admin"}
+        ✅ Driver (driver@tripzen.com) → 200, identical admin contact returned
+        ✅ Admin → 200 with {contact: null, reason: "you_are_support"}
+        ✅ Unauthenticated → 401 {"detail":"Not authenticated"}
+        ✅ Regression smoke: POST /api/auth/login 200, GET /api/trips/active (driver) 200,
+            GET /api/admin/stats (admin) 200.
+      ALL PASS — support contact endpoint works.
+  - agent: "testing"
+    message: |
       REGRESSION TEST after server.py refactor (21 modules under /app/backend/):
       core/{config,db,security,models}.py, services/{notifications,ws,geo}.py,
       routes/{auth,students,bus_routes,trips,notifications,bookings,admin,messages,

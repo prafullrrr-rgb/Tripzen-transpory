@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, Alert, Linking, Platform } from "react-native";
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, Alert } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
@@ -47,11 +47,25 @@ export default function DriverAccount() {
     router.replace("/login");
   };
 
-  const callDispatch = async () => {
-    const url = Platform.OS === "web" ? "mailto:dispatch@tripzen.app" : "tel:+441234567890";
-    const can = await Linking.canOpenURL(url).catch(() => false);
-    if (can) Linking.openURL(url);
-    else Alert.alert("Dispatch", "dispatch@tripzen.app\n+44 1234 567 890");
+  const openSupportChat = async () => {
+    try {
+      const res = await api.get<{ contact: { id: string; full_name: string } | null }>(
+        "/support/contact",
+      );
+      if (!res.contact) {
+        Alert.alert("Support", "No dispatch agent available right now.");
+        return;
+      }
+      router.push({
+        pathname: "/chat",
+        params: {
+          other_id: res.contact.id,
+          other_name: res.contact.full_name || "Dispatch",
+        },
+      });
+    } catch (e: any) {
+      Alert.alert("Support", e.message || "Could not open chat");
+    }
   };
 
   return (
@@ -102,10 +116,10 @@ export default function DriverAccount() {
                 { icon: "people", title: "Confirm headcount", body: "Scan every child on boarding and at drop-off. Never depart with unaccounted students." },
                 { icon: "speedometer", title: "Speed limits", body: "Max 30mph in school zones, 50mph elsewhere." },
                 { icon: "alert-circle", title: "SOS protocol", body: "Press SOS for any emergency. Admin + parents are alerted instantly." },
-                { icon: "call", title: "Dispatch contact", body: "+44 1234 567 890 — available 24/7." },
+                { icon: "chatbubbles", title: "Chat dispatch", body: "Tap Support to chat with dispatch directly — 24/7." },
               ],
-              primaryLabel: "Call dispatch",
-              onPrimary: callDispatch,
+              primaryLabel: "Chat with Dispatch",
+              onPrimary: openSupportChat,
             })
           }
         />
@@ -116,25 +130,11 @@ export default function DriverAccount() {
           onPress={() => router.push("/driver")}
         />
         <Menu
-          icon="help-circle"
-          label="Support"
+          icon="chatbubbles"
+          label="Chat with Dispatch"
           right="24/7"
           testID="d-menu-help"
-          onPress={() =>
-            setInfoSheet({
-              icon: "help-circle",
-              iconColor: COLORS.accent,
-              title: "Driver Support",
-              body: "Need help mid-route? Contact dispatch immediately. For app issues, email us.",
-              bullets: [
-                { icon: "call", title: "Dispatch (24/7)", body: "+44 1234 567 890" },
-                { icon: "mail", title: "App support", body: "drivers@tripzen.app" },
-                { icon: "book", title: "Driver handbook", body: "Open the safety protocols above for the full SOP." },
-              ],
-              primaryLabel: "Call dispatch",
-              onPrimary: callDispatch,
-            })
-          }
+          onPress={openSupportChat}
         />
         <Menu
           icon="information-circle"

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, Modal, Alert, Linking, Platform } from "react-native";
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, Modal, Alert } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
@@ -54,13 +54,6 @@ export default function AdminAccount() {
     } catch (e: any) {
       Alert.alert("Export failed", e.message);
     }
-  };
-
-  const callSupport = async () => {
-    const url = Platform.OS === "web" ? "mailto:enterprise@tripzen.app" : "tel:+441234567890";
-    const can = await Linking.canOpenURL(url).catch(() => false);
-    if (can) Linking.openURL(url);
-    else Alert.alert("Enterprise Support", "enterprise@tripzen.app\n+44 1234 567 890");
   };
 
   const activeLang = SUPPORTED_LANGS.find((l) => l.code === currentLang) || SUPPORTED_LANGS[0];
@@ -144,17 +137,31 @@ export default function AdminAccount() {
                 { icon: "sparkles", title: "AI Engine", body: "Claude Sonnet 4.5 via Emergent LLM." },
                 { icon: "code-slash", title: "Version", body: "TripZen v1.0.0 (June 2025)" },
               ],
-              primaryLabel: "Contact platform team",
-              onPrimary: callSupport,
             })
           }
         />
         <Menu
-          icon="help-circle"
-          label="Enterprise Support"
-          right="24/7"
+          icon="chatbubbles"
+          label="Support Center"
+          right="You are support"
           testID="a-menu-help"
-          onPress={callSupport}
+          onPress={() =>
+            setInfoSheet({
+              icon: "chatbubbles",
+              iconColor: COLORS.accent,
+              title: "You are TripZen Support",
+              subtitle: "Parents and drivers chat to you",
+              body:
+                "When parents or drivers tap 'Chat with Support', their messages land in your inbox. Open Alerts & Incidents to see flagged cases.",
+              bullets: [
+                { icon: "people", title: "Direct line to families", body: "Every parent can DM you 24/7 — no phone needed." },
+                { icon: "alert-circle", title: "Critical alerts auto-escalated", body: "SOS and breakdowns appear in Alerts & Incidents." },
+                { icon: "bus", title: "Driver dispatch", body: "Drivers chat you for mid-route help." },
+              ],
+              primaryLabel: "Open Alerts",
+              onPrimary: () => router.push("/admin/alerts"),
+            })
+          }
         />
         <Menu
           icon="information-circle"

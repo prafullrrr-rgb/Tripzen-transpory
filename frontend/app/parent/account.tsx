@@ -1,4 +1,4 @@
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, Alert, Modal, Linking, Platform } from "react-native";
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, Alert, Modal } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
@@ -41,11 +41,25 @@ export default function ParentAccount() {
     setLangOpen(false);
   };
 
-  const callSupport = async () => {
-    const url = Platform.OS === "web" ? "mailto:support@tripzen.app" : "tel:+441234567890";
-    const can = await Linking.canOpenURL(url).catch(() => false);
-    if (can) Linking.openURL(url);
-    else Alert.alert("Support", "support@tripzen.app\n+44 1234 567 890");
+  const openSupportChat = async () => {
+    try {
+      const res = await api.get<{ contact: { id: string; full_name: string } | null }>(
+        "/support/contact",
+      );
+      if (!res.contact) {
+        Alert.alert("Support", "No support agent available right now.");
+        return;
+      }
+      router.push({
+        pathname: "/chat",
+        params: {
+          other_id: res.contact.id,
+          other_name: res.contact.full_name || "TripZen Support",
+        },
+      });
+    } catch (e: any) {
+      Alert.alert("Support", e.message || "Could not open chat");
+    }
   };
 
   const activeLang = SUPPORTED_LANGS.find((l) => l.code === currentLang) || SUPPORTED_LANGS[0];
@@ -172,6 +186,13 @@ export default function ParentAccount() {
 
         <Text style={styles.sectionTitle}>Support</Text>
         <MenuItem
+          icon="chatbubbles"
+          label="Chat with Support"
+          right="24/7"
+          testID="menu-support-chat"
+          onPress={openSupportChat}
+        />
+        <MenuItem
           icon="help-circle"
           label="Help Center"
           testID="menu-help"
@@ -184,19 +205,12 @@ export default function ParentAccount() {
                 { icon: "play-circle", title: "Getting started", body: "Add your child → link to a route → book a plan → track live." },
                 { icon: "card", title: "Billing", body: "Manage your subscription from Payment Methods. Cancel anytime." },
                 { icon: "bus", title: "Missed pickup?", body: "Open chat with the driver from the home screen." },
-                { icon: "warning", title: "Emergency", body: "If your child is missing, tap the SOS button or call us." },
+                { icon: "warning", title: "Emergency", body: "If your child is missing, tap the SOS button or chat support." },
               ],
-              primaryLabel: "Contact support",
-              onPrimary: callSupport,
+              primaryLabel: "Chat with Support",
+              onPrimary: openSupportChat,
             })
           }
-        />
-        <MenuItem
-          icon="call"
-          label="24/7 Support"
-          right="+44 1234 567 890"
-          testID="menu-support"
-          onPress={callSupport}
         />
         <MenuItem
           icon="information-circle"
