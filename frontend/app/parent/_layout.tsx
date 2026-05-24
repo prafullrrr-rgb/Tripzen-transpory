@@ -1,8 +1,21 @@
-import { Tabs } from "expo-router";
+import { Tabs, useRouter } from "expo-router";
+import { useEffect } from "react";
 import { Ionicons } from "@expo/vector-icons";
 import { COLORS } from "@/src/constants/theme";
+import { useAuth } from "@/src/contexts/AuthContext";
 
 export default function ParentLayout() {
+  const { user, loading } = useAuth();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (!loading && (!user || user.role !== "parent")) {
+      router.replace("/login");
+    }
+  }, [user, loading, router]);
+
+  if (!user) return null;
+
   return (
     <Tabs
       screenOptions={{
@@ -47,6 +60,7 @@ export default function ParentLayout() {
           tabBarIcon: ({ color }) => <Ionicons name="person" size={22} color={color} />,
         }}
       />
+      <Tabs.Screen name="booking" options={{ href: null }} />
     </Tabs>
   );
 }

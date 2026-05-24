@@ -1,8 +1,21 @@
-import { Tabs } from "expo-router";
+import { Tabs, useRouter } from "expo-router";
+import { useEffect } from "react";
 import { Ionicons } from "@expo/vector-icons";
 import { COLORS } from "@/src/constants/theme";
+import { useAuth } from "@/src/contexts/AuthContext";
 
 export default function DriverLayout() {
+  const { user, loading } = useAuth();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (!loading && (!user || user.role !== "driver")) {
+      router.replace("/login");
+    }
+  }, [user, loading, router]);
+
+  if (!user) return null;
+
   return (
     <Tabs
       screenOptions={{

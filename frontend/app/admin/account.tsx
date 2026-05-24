@@ -1,26 +1,18 @@
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, Alert } from "react-native";
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useAuth } from "@/src/contexts/AuthContext";
 import { COLORS, SPACING, RADIUS } from "@/src/constants/theme";
+import { confirm } from "@/src/utils/confirm";
 
 export default function AdminAccount() {
   const { user, signOut } = useAuth();
   const router = useRouter();
 
-  const handleSignOut = () => {
-    Alert.alert("Sign out?", "You'll need to log in again.", [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Sign out",
-        style: "destructive",
-        onPress: async () => {
-          await signOut();
-          router.replace("/login");
-        },
-      },
-    ]);
+  const handleSignOut = async () => {
+    await signOut();
+    router.replace("/login");
   };
 
   return (
