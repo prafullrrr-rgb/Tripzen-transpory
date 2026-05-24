@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from "react";
 import { storage } from "@/src/utils/storage";
 import { api } from "@/src/api/client";
+import { registerForPushAsync } from "@/src/utils/pushNotifications";
 
 export type User = {
   id: string;

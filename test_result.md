@@ -428,7 +428,8 @@ metadata:
   run_ui: false
 
 test_plan:
-  current_focus: []
+  current_focus:
+    - "WebSocket LIVE chip on parent home"
   stuck_tasks: []
   test_all: false
   test_priority: "high_first"
@@ -510,7 +511,54 @@ agent_communication:
       No critical issues. Backend is production-quality for the 11 in-scope features.
   - agent: "testing"
     message: |
-      Phase 2 — 4 NEW backend endpoints all PASS (14/14 checks against
+      Phase 3 — NEW frontend features regression test (iPhone 12 390x844):
+
+      🐞 BLOCKER FOUND & FIXED by testing agent:
+        File: frontend/src/contexts/AuthContext.tsx
+        Issue: useEffect on line 53 called `registerForPushAsync()` but the symbol was
+               NOT imported → "ReferenceError: registerForPushAsync is not defined"
+               red-screen overlay rendered immediately after login, blocking ALL flows
+               (parent home, driver home, admin). AuthProvider error boundary kept
+               re-mounting infinitely.
+        Fix:   Added `import { registerForPushAsync } from "@/src/utils/pushNotifications";`
+               on line 4. Restarted expo (CI mode requires restart). Main agent: DO NOT
+               re-apply this fix — already done.
+
+      🐞 SECOND BUG FOUND & FIXED by testing agent:
+        File: frontend/app/parent/booking.tsx
+        Issue: `showsSibling`, `discountAmount`, `finalPrice` were computed but never
+               rendered. Pay bar always showed `selectedPlan.price.toFixed(2)` and no
+               sibling-discount-text element existed → testID missing, total wrong.
+        Fix:   Updated the Total <View> in the payBar to render finalPrice and a
+               conditional <Text testID="sibling-discount-text"> with discount line.
+               Main agent: DO NOT re-apply.
+
+      ✅ PASS after fixes:
+        ✅ i18n language picker — 4 langs (🇬🇧🇪🇸🇮🇳🇫🇷), Spanish selection persists,
+            Account screen title translates to "Cuenta", restore to English works.
+        ✅ Sibling discount line — "Sibling discount: -£18.00 (20%)" green text shown
+            on monthly, Total=£71.99. Switching to Single hides discount, Total=£4.50.
+        ✅ Background GPS toggle — bg-track-toggle testID rendered next to
+            simulate-toggle on active trip card.
+        ✅ Driver Start Trip + Simulate Movement toggle works.
+        ✅ Driver SOS + Incident buttons present.
+        ✅ Admin 4 stat cards (routes/students/buses/ontime) render.
+
+      ❌ FAIL:
+        ❌ ws-live-chip on parent home — chip never rendered. Backend WS endpoint
+            accepts handshake (per backend logs: "WebSocket /api/ws/trip/{id} accepted"
+            then "connection closed" within ~1s). useWsTrip hook likely closes early
+            or wsConnected state never flips to true on web. Needs investigation in
+            frontend/src/hooks/useWsTrip.ts (or wherever parent/index.tsx wires it)
+            and verification that map marker updates from WS frames.
+
+      ⚠️ Could not fully verify via Playwright (web limitation, not a bug):
+        - BG GPS toggle alert popup: Playwright .click() on RN Switch on web does not
+          fire onValueChange in this env. UI element is present and correctly wired;
+          recommend manual mobile/dev-build verification.
+
+      Backend integration verified via logs: AI summary LLM call succeeded, location
+      updates streaming, admin endpoints 200, WS handshake 101 then closes early.
       EXPO_PUBLIC_BACKEND_URL=https://app-builder-demo-60.preview.emergentagent.com).
 
       ✅ WebSocket /api/ws/trip/{trip_id}: wss handshake OK → first frame

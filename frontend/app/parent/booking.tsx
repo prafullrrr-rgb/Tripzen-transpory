@@ -225,7 +225,12 @@ export default function Booking() {
         <View style={styles.payBar}>
           <View>
             <Text style={styles.payBarLabel}>Total</Text>
-            <Text style={styles.payBarAmount}>£{selectedPlan.price.toFixed(2)}</Text>
+            <Text style={styles.payBarAmount}>£{finalPrice.toFixed(2)}</Text>
+            {showsSibling && (
+              <Text style={styles.discountText} testID="sibling-discount-text">
+                Sibling discount: -£{discountAmount.toFixed(2)} (20%)
+              </Text>
+            )}
           </View>
           <TouchableOpacity
             testID="pay-with-stripe-btn"
