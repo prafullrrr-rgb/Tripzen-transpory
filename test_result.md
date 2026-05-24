@@ -586,3 +586,42 @@ agent_communication:
           usage.
 
       All 4 in-scope phase-2 tasks are green; no critical issues.
+  - agent: "testing"
+    message: |
+      REGRESSION TEST after server.py refactor (21 modules under /app/backend/):
+      core/{config,db,security,models}.py, services/{notifications,ws,geo}.py,
+      routes/{auth,students,bus_routes,trips,notifications,bookings,admin,messages,
+      parent,integrations}.py, seed.py, plus slim server.py.
+
+      Executed /app/regression_test.py against EXPO_PUBLIC_BACKEND_URL/api.
+      Coverage: all 19 items from the review request.
+
+      RESULT: 37/37 PASS — ALL PASS — refactor clean.
+
+      Highlights:
+        ✅ auth/login (admin/driver/parent), auth/me returns correct role
+        ✅ students (parent + admin), routes (admin + driver-filtered)
+        ✅ trips lifecycle: start → location → board scan (Aarav QR) → SOS →
+            incident → ETA → checkout scan → end, all 200
+        ✅ trips/active returns active trip for driver
+        ✅ bookings single (£4.50) + pay, monthly + pay, 2nd monthly = £71.99
+            (sibling 20% discount kicks in correctly)
+        ✅ messages POST {recipient_id, text} → 200, GET /messages/{other},
+            GET /messages threads
+        ✅ parent/weekly-summary → ai_generated=true (real Claude call)
+        ✅ parent/gdpr-export returns all 6 required keys (user, children,
+            bookings, notifications, messages, ratings) + exported_at
+        ✅ ratings POST 5★ → 200
+        ✅ admin/{stats,users,revenue,alerts,incidents} all 200
+        ✅ WebSocket /api/ws/trip/{id} — snapshot frame with correct trip.id
+        ✅ users/push-token → 200 ok=true
+        ✅ bookings/{id}/payment-intent → mocked=true, client_secret pi_mock_…
+            bookings/{id}/confirm-payment → ok=true, amount=4.5
+        ✅ notifications/whatsapp → mocked=true (Twilio env unset, log line
+            confirms 'WhatsApp MOCK send to=…')
+
+      Note: one test-script-only fix during run — messages POST schema is
+      {recipient_id, text} (not {to_id, content}). Server code unchanged.
+
+      Refactor is clean: every endpoint that previously worked still works
+      with identical response shapes. No regressions detected.

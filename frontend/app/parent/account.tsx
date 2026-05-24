@@ -1,4 +1,4 @@
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, Alert, Modal } from "react-native";
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, Alert, Modal, Linking, Platform } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
@@ -9,6 +9,8 @@ import { COLORS, SPACING, RADIUS } from "@/src/constants/theme";
 import { api } from "@/src/api/client";
 import { SUPPORTED_LANGS, setLanguage } from "@/src/i18n";
 import i18n from "@/src/i18n";
+import InfoSheet, { InfoBullet } from "@/src/components/InfoSheet";
+import NotificationPrefsSheet from "@/src/components/NotificationPrefsSheet";
 
 export default function ParentAccount() {
   const { user, signOut } = useAuth();
@@ -16,6 +18,17 @@ export default function ParentAccount() {
   const { t } = useTranslation();
   const [langOpen, setLangOpen] = useState(false);
   const [currentLang, setCurrentLang] = useState(i18n.language);
+  const [prefsOpen, setPrefsOpen] = useState(false);
+  const [infoSheet, setInfoSheet] = useState<null | {
+    icon: string;
+    iconColor?: string;
+    title: string;
+    subtitle?: string;
+    body?: string;
+    bullets?: InfoBullet[];
+    primaryLabel?: string;
+    onPrimary?: () => void;
+  }>(null);
 
   const handleSignOut = async () => {
     await signOut();
@@ -26,6 +39,13 @@ export default function ParentAccount() {
     await setLanguage(code);
     setCurrentLang(code);
     setLangOpen(false);
+  };
+
+  const callSupport = async () => {
+    const url = Platform.OS === "web" ? "mailto:support@tripzen.app" : "tel:+441234567890";
+    const can = await Linking.canOpenURL(url).catch(() => false);
+    if (can) Linking.openURL(url);
+    else Alert.alert("Support", "support@tripzen.app\n+44 1234 567 890");
   };
 
   const activeLang = SUPPORTED_LANGS.find((l) => l.code === currentLang) || SUPPORTED_LANGS[0];
@@ -50,8 +70,34 @@ export default function ParentAccount() {
         </View>
 
         <Text style={styles.sectionTitle}>Settings</Text>
-        <MenuItem icon="notifications" label={t("settings.notifications")} testID="menu-notifications" />
-        <MenuItem icon="card" label="Payment Methods" testID="menu-payments" />
+        <MenuItem
+          icon="notifications"
+          label={t("settings.notifications")}
+          testID="menu-notifications"
+          onPress={() => setPrefsOpen(true)}
+        />
+        <MenuItem
+          icon="card"
+          label="Payment Methods"
+          testID="menu-payments"
+          onPress={() =>
+            setInfoSheet({
+              icon: "card",
+              iconColor: COLORS.success,
+              title: "Payment Methods",
+              subtitle: "Powered by Stripe",
+              body:
+                "All payments are processed securely by Stripe. Add or change your payment method during checkout.",
+              bullets: [
+                { icon: "lock-closed", title: "Secure", body: "Card details never touch our servers." },
+                { icon: "card", title: "All major cards", body: "Visa, Mastercard, Amex, Apple Pay, Google Pay." },
+                { icon: "people", title: "Sibling discount", body: "20% off automatically on second monthly plan." },
+              ],
+              primaryLabel: "Book a trip",
+              onPrimary: () => router.push("/parent/booking"),
+            })
+          }
+        />
         <MenuItem
           icon="language"
           label={t("settings.language")}
@@ -59,7 +105,25 @@ export default function ParentAccount() {
           testID="menu-language"
           onPress={() => setLangOpen(true)}
         />
-        <MenuItem icon="shield-checkmark" label="Privacy & Security" testID="menu-privacy" />
+        <MenuItem
+          icon="shield-checkmark"
+          label="Privacy & Security"
+          testID="menu-privacy"
+          onPress={() =>
+            setInfoSheet({
+              icon: "shield-checkmark",
+              iconColor: COLORS.primary,
+              title: "Privacy & Security",
+              subtitle: "Your data is protected",
+              bullets: [
+                { icon: "lock-closed", title: "End-to-end encryption", body: "All trip data is encrypted in transit (TLS 1.3) and at rest." },
+                { icon: "eye-off", title: "No third-party tracking", body: "We never sell your data or your child's location to advertisers." },
+                { icon: "people", title: "Verified drivers only", body: "Every driver is DBS-checked, trained and continuously monitored." },
+                { icon: "trash", title: "Right to be forgotten", body: "Delete your account anytime — see GDPR options below." },
+              ],
+            })
+          }
+        />
 
         <Text style={styles.sectionTitle}>Privacy & Data</Text>
         <MenuItem
@@ -76,11 +140,85 @@ export default function ParentAccount() {
             }
           }}
         />
+        <MenuItem
+          icon="trash"
+          label="Delete My Account"
+          testID="menu-gdpr-delete"
+          onPress={() =>
+            setInfoSheet({
+              icon: "warning",
+              iconColor: COLORS.error,
+              title: "Delete Account?",
+              subtitle: "This is permanent",
+              body:
+                "Deleting your account removes all children, bookings, messages and ratings. This cannot be undone.",
+              bullets: [
+                { icon: "alert-circle", title: "Loss of data", body: "Active bookings will not be refunded." },
+                { icon: "time", title: "30-day grace", body: "Contact support within 30 days to recover." },
+              ],
+              primaryLabel: "I understand — Delete",
+              onPrimary: async () => {
+                try {
+                  await api.delete("/parent/account");
+                  await signOut();
+                  router.replace("/login");
+                } catch (e: any) {
+                  Alert.alert("Failed", e.message);
+                }
+              },
+            })
+          }
+        />
 
         <Text style={styles.sectionTitle}>Support</Text>
-        <MenuItem icon="help-circle" label="Help Center" testID="menu-help" />
-        <MenuItem icon="call" label="24/7 Support" testID="menu-support" />
-        <MenuItem icon="information-circle" label="About TripZen" testID="menu-about" />
+        <MenuItem
+          icon="help-circle"
+          label="Help Center"
+          testID="menu-help"
+          onPress={() =>
+            setInfoSheet({
+              icon: "help-circle",
+              iconColor: COLORS.accent,
+              title: "How can we help?",
+              bullets: [
+                { icon: "play-circle", title: "Getting started", body: "Add your child → link to a route → book a plan → track live." },
+                { icon: "card", title: "Billing", body: "Manage your subscription from Payment Methods. Cancel anytime." },
+                { icon: "bus", title: "Missed pickup?", body: "Open chat with the driver from the home screen." },
+                { icon: "warning", title: "Emergency", body: "If your child is missing, tap the SOS button or call us." },
+              ],
+              primaryLabel: "Contact support",
+              onPrimary: callSupport,
+            })
+          }
+        />
+        <MenuItem
+          icon="call"
+          label="24/7 Support"
+          right="+44 1234 567 890"
+          testID="menu-support"
+          onPress={callSupport}
+        />
+        <MenuItem
+          icon="information-circle"
+          label="About TripZen"
+          testID="menu-about"
+          onPress={() =>
+            setInfoSheet({
+              icon: "information-circle",
+              iconColor: COLORS.primary,
+              title: "About TripZen",
+              subtitle: "Version 1.0.0",
+              body:
+                "TripZen is the safest way to send your child to school. Built with safety, transparency and trust at its core.",
+              bullets: [
+                { icon: "people", title: "DBS-verified drivers", body: "Every driver passes enhanced background checks." },
+                { icon: "navigate", title: "Real-time tracking", body: "Always know where your child is." },
+                { icon: "sparkles", title: "AI-powered insights", body: "Weekly summaries by Claude." },
+                { icon: "heart", title: "Made with love", body: "© 2025 TripZen Ltd. UK." },
+              ],
+            })
+          }
+        />
 
         <TouchableOpacity
           testID="signout-btn"
@@ -123,6 +261,24 @@ export default function ParentAccount() {
           </View>
         </View>
       </Modal>
+      {/* Notification preferences sheet */}
+      <NotificationPrefsSheet visible={prefsOpen} onClose={() => setPrefsOpen(false)} />
+
+      {/* Generic info sheet for misc tabs */}
+      {infoSheet && (
+        <InfoSheet
+          visible={!!infoSheet}
+          onClose={() => setInfoSheet(null)}
+          icon={infoSheet.icon}
+          iconColor={infoSheet.iconColor}
+          title={infoSheet.title}
+          subtitle={infoSheet.subtitle}
+          body={infoSheet.body}
+          bullets={infoSheet.bullets}
+          primaryLabel={infoSheet.primaryLabel}
+          onPrimary={infoSheet.onPrimary}
+        />
+      )}
     </SafeAreaView>
   );
 }
