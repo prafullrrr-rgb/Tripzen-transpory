@@ -308,7 +308,7 @@ backend:
 frontend:
   - task: "Login / Register / Auth gate"
     implemented: true
-    working: "NA"
+    working: true
     file: "frontend/app/login.tsx"
     stuck_count: 0
     priority: "high"
@@ -317,8 +317,51 @@ frontend:
       - working: "NA"
         agent: "main"
         comment: "Pending user confirmation before running expo frontend tests."
+      - working: true
+        agent: "testing"
+        comment: "E2E mobile (390x844 + 360x800): / → /login redirect OK. Demo Parent/Driver/Admin buttons pre-fill credentials and Sign In lands on /parent, /driver, /admin respectively. Invalid creds keep user on /login (Alert.alert via dialog). Register new parent (qa_*@example.com) → /parent OK. Galaxy S21 happy-path smoke also OK."
+
+  - task: "Parent app (home, booking, history, messages, account, GDPR)"
+    implemented: true
+    working: true
+    file: "frontend/app/parent/*.tsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: false
+        agent: "testing"
+        comment: "FOUND BUG: frontend/app/parent/account.tsx used Alert.alert(...) but did NOT import Alert from react-native, so tapping GDPR Export crashed with 'Alert is not defined' red-overlay error, blocking GDPR ack AND sign-out AND cascading into every later test (admin screens, register)."
+      - working: true
+        agent: "testing"
+        comment: "FIX APPLIED by testing agent: added `Alert` to the react-native import in frontend/app/parent/account.tsx (line 1). Re-verified: GDPR Export now shows success summary (no redbox), sign-out returns to /login. Home shows ai-summary-card + trip-status-card. Booking screen plan picker shows £89.99 monthly / £4.50 single. History opens. Messages screen via bottom tab. quick-chat-btn opens /chat. Main agent: please DO NOT re-apply this fix — already done."
+
+  - task: "Driver app (home, scan, SOS, incident, end-trip, account)"
+    implemented: true
+    working: true
+    file: "frontend/app/driver/*.tsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "Full driver happy-path verified end-to-end on 390x844: login → driver-home-screen shows 'Welcome back John' + Route 3 - Morning (Bus 3 • 4 stops • 1 student). Start trip → active-trip-card appears. Open scanner → manual entry of TRIPZEN-17304D76 (Aarav) → action-board succeeds (backend POST /api/trips/.../scan 200). SOS button → POST /api/trips/.../sos 200. Incident modal → submit → POST /api/trips/.../incident 200. End trip works. Driver sign out returns to /login."
+
+  - task: "Admin app (overview, routes, students, drivers, bookings, alerts, account)"
+    implemented: true
+    working: true
+    file: "frontend/app/admin/*.tsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "Admin overview shows all 4 stat cards (stat-routes, stat-students, stat-buses, stat-ontime). All 5 admin sub-screens (/admin/routes, /students, /drivers, /bookings, /alerts) load with expected testIDs. Add Route and Add Student modals open + cancel cleanly. Admin sign out works. Note: initial run failed cascade-style because of the parent/account.tsx Alert bug overlay; after fix all admin flows pass."
 
 metadata:
+  frontend_tested: true
   created_by: "main_agent"
   version: "1.1"
   test_sequence: 3
@@ -342,6 +385,39 @@ test_plan:
   test_priority: "high_first"
 
 agent_communication:
+  - agent: "testing"
+    message: |
+      Frontend E2E mobile testing (iPhone 12 390x844 + Galaxy S21 360x800) on TripZen.
+
+      🐞 BUG FOUND & FIXED by testing agent (1-line):
+        File: frontend/app/parent/account.tsx
+        Issue: line 54 called `Alert.alert("Failed", ...)` but `Alert` was NOT imported from
+               react-native → uncaught "Alert is not defined" red-overlay error appeared the
+               moment a user tapped GDPR Export. Overlay then blocked sign-out and cascaded
+               into Admin tests because the page remained frozen.
+        Fix:   added `Alert` to the `react-native` import on line 1. Verified GDPR ack now
+               shows summary and sign-out works. Main agent: please DO NOT re-apply.
+
+      ✅ All five frontend tasks now PASS:
+        ✅ Login / Register / Auth gate (demo buttons, invalid creds, registration)
+        ✅ Parent app (home with ai-summary-card + trip-status-card, Booking £89.99/£4.50,
+            History, Messages, /chat via quick-chat-btn, Account, GDPR export)
+        ✅ Driver app (Route 3 - Morning start trip, manual QR TRIPZEN-17304D76 → board
+            Aarav, SOS, Incident submit, End trip, sign-out)
+        ✅ Admin app (4 stat cards, /admin/{routes,students,drivers,bookings,alerts},
+            Add Route + Add Student modals open/cancel, sign-out)
+        ✅ Galaxy S21 360x800 smoke (parent home renders cleanly)
+
+      Console: 0 errors after fix (was 8 cascading 403s + 1 redbox before).
+      Backend logs show 200 OK on all hit endpoints during the run.
+
+  - agent: "testing"
+    message: |
+      All 11 in-scope backend features PASS comprehensive E2E test.
+      Sibling discount applies correctly (20% on 2nd monthly = 71.99).
+      AI weekly summary uses real Claude (ai_generated=true) and fallback path exists.
+      Role gating verified (parent→another-parent chat = 403, parent→admin/stats = 403).
+      Push/native-stripe/BG-GPS skipped (native-only). Backend ready for frontend testing.
   - agent: "main"
     message: |
       Please run a comprehensive backend test suite for TripZen. Seed creds are in
