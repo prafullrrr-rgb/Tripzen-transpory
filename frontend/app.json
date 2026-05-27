@@ -1,22 +1,48 @@
 {
   "expo": {
-    "name": "frontend",
-    "slug": "frontend",
+    "name": "TripZen",
+    "slug": "tripzen",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "frontend",
+    "scheme": "tripzen",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.tripzen.app",
+      "buildNumber": "1",
+      "infoPlist": {
+        "NSCameraUsageDescription": "Scan student QR badges for safe boarding.",
+        "NSLocationWhenInUseUsageDescription": "Track the bus route in real-time.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "Keep parents updated when the bus is in service.",
+        "NFCReaderUsageDescription": "Tap student NFC badges to mark boarding.",
+        "NSPhotoLibraryUsageDescription": "Attach photos to incident reports.",
+        "NSMicrophoneUsageDescription": "Record audio notes for incident reports.",
+        "UIBackgroundModes": ["location", "fetch", "remote-notification"],
+        "ITSAppUsesNonExemptEncryption": false
+      },
+      "associatedDomains": []
     },
     "android": {
+      "package": "com.tripzen.app",
+      "versionCode": 1,
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#000000"
       },
-      "edgeToEdgeEnabled": true
+      "edgeToEdgeEnabled": true,
+      "permissions": [
+        "CAMERA",
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_BACKGROUND_LOCATION",
+        "FOREGROUND_SERVICE",
+        "FOREGROUND_SERVICE_LOCATION",
+        "POST_NOTIFICATIONS",
+        "VIBRATE",
+        "NFC"
+      ]
     },
     "web": {
       "bundler": "metro",
@@ -65,35 +91,15 @@
         }
       ]
     ],
-    "ios": {
-      "supportsTablet": true,
-      "infoPlist": {
-        "NSCameraUsageDescription": "Scan student QR badges for safe boarding.",
-        "NSLocationWhenInUseUsageDescription": "Track the bus route in real-time.",
-        "NSLocationAlwaysAndWhenInUseUsageDescription": "Keep parents updated when the bus is in service.",
-        "UIBackgroundModes": ["location", "fetch", "remote-notification"]
-      }
-    },
-    "android": {
-      "adaptiveIcon": {
-        "foregroundImage": "./assets/images/adaptive-icon.png",
-        "backgroundColor": "#000000"
-      },
-      "edgeToEdgeEnabled": true,
-      "permissions": [
-        "CAMERA",
-        "ACCESS_COARSE_LOCATION",
-        "ACCESS_FINE_LOCATION",
-        "ACCESS_BACKGROUND_LOCATION",
-        "FOREGROUND_SERVICE",
-        "FOREGROUND_SERVICE_LOCATION",
-        "POST_NOTIFICATIONS",
-        "VIBRATE",
-        "NFC"
-      ]
-    },
     "experiments": {
       "typedRoutes": true
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": ""
+      }
+    },
+    "owner": ""
   }
 }
