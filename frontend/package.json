@@ -65,7 +65,9 @@
   "expo": {
     "doctor": {
       "reactNativeDirectoryCheck": {
-        "exclude": ["react-native-nfc-manager"]
+        "exclude": [
+          "react-native-nfc-manager"
+        ]
       }
     }
   },

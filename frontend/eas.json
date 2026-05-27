@@ -9,8 +9,7 @@
       "distribution": "internal",
       "channel": "development",
       "env": {
-        "EXPO_PUBLIC_BACKEND_URL": "https://app-builder-demo-60.preview.emergentagent.com",
-        "EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY": ""
+        "EXPO_PUBLIC_BACKEND_URL": "https://app-builder-demo-60.emergent.host"
       },
       "ios": {
         "simulator": true
@@ -23,8 +22,7 @@
       "distribution": "internal",
       "channel": "preview",
       "env": {
-        "EXPO_PUBLIC_BACKEND_URL": "https://app-builder-demo-60.preview.emergentagent.com",
-        "EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY": ""
+        "EXPO_PUBLIC_BACKEND_URL": "https://app-builder-demo-60.emergent.host"
       },
       "ios": {
         "simulator": false
@@ -38,8 +36,7 @@
       "channel": "production",
       "autoIncrement": true,
       "env": {
-        "EXPO_PUBLIC_BACKEND_URL": "https://app-builder-demo-60.preview.emergentagent.com",
-        "EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY": ""
+        "EXPO_PUBLIC_BACKEND_URL": "https://app-builder-demo-60.emergent.host"
       },
       "ios": {
         "simulator": false
