@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TripZen — Privacy Policy</title>
+  <meta name="description" content="TripZen privacy policy. How we collect, use, and protect your data." />
+  <style>
+    :root {
+      --primary: #0F1B3D;
+      --accent: #FCB813;
+      --text: #1a1a1a;
+      --muted: #5a5a5a;
+      --bg: #ffffff;
+      --border: #e6e6e6;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      color: var(--text);
+      background: var(--bg);
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+    }
+    header {
+      background: var(--primary);
+      color: #fff;
+      padding: 32px 24px;
+      text-align: center;
+    }
+    .brand { display: inline-flex; align-items: center; gap: 12px; }
+    .badge {
+      width: 44px; height: 44px; border-radius: 12px;
+      background: var(--accent); color: var(--primary);
+      display: flex; align-items: center; justify-content: center;
+      font-weight: 800; font-size: 22px;
+    }
+    h1 { font-size: 28px; margin-top: 16px; }
+    h2 { font-size: 20px; margin: 32px 0 12px; color: var(--primary); }
+    h3 { font-size: 16px; margin: 20px 0 8px; }
+    main { max-width: 760px; margin: 0 auto; padding: 32px 24px 64px; }
+    p, li { color: var(--text); font-size: 15px; }
+    ul { padding-left: 22px; margin: 8px 0 16px; }
+    li { margin: 6px 0; }
+    .updated { color: var(--muted); font-size: 13px; margin-top: 4px; }
+    .card {
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 24px 0;
+      background: #fafafa;
+    }
+    a { color: var(--primary); font-weight: 600; }
+    footer {
+      border-top: 1px solid var(--border);
+      padding: 24px;
+      text-align: center;
+      color: var(--muted);
+      font-size: 13px;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="brand">
+      <div class="badge">T</div>
+      <strong style="font-size: 22px;">TripZen</strong>
+    </div>
+    <h1>Privacy Policy</h1>
+    <p class="updated">Last updated: June 2025</p>
+  </header>
+
+  <main>
+    <p>
+      TripZen ("we", "our", or "the App") provides a child transport safety platform for parents,
+      drivers, and schools. This Privacy Policy explains what information we collect, why we collect it,
+      how we use it, and the choices you have. By using TripZen you agree to this policy.
+    </p>
+
+    <h2>1. Information We Collect</h2>
+    <ul>
+      <li><strong>Account info:</strong> name, email, phone number, role (parent / driver / admin), password (hashed).</li>
+      <li><strong>Student info:</strong> name, grade, photo, school, pickup/dropoff address — provided only by the parent, guardian, or authorized school administrator.</li>
+      <li><strong>Location data:</strong> precise GPS location of buses during active routes for live tracking. Driver devices may transmit location in the background only while a trip is active.</li>
+      <li><strong>Boarding logs:</strong> timestamp, bus, route, and student identifier when a QR or NFC badge is scanned.</li>
+      <li><strong>Payment data:</strong> processed by Stripe. We never store full card numbers. We retain only the last 4 digits and the Stripe transaction ID.</li>
+      <li><strong>Communications:</strong> in-app chat messages, incident reports, and photos you submit.</li>
+      <li><strong>Device data:</strong> device model, operating system, app version, push notification token, crash diagnostics.</li>
+    </ul>
+
+    <h2>2. How We Use Your Information</h2>
+    <ul>
+      <li>Provide real-time bus tracking to authorized parents and admins.</li>
+      <li>Authenticate users and prevent unauthorized access.</li>
+      <li>Send push notifications, SMS, or email alerts about boarding events and trip status.</li>
+      <li>Process bookings, subscriptions, and payments.</li>
+      <li>Investigate incidents and improve service quality.</li>
+      <li>Comply with legal obligations.</li>
+    </ul>
+
+    <h2>3. Children's Data (COPPA &amp; GDPR-K)</h2>
+    <div class="card">
+      We do <strong>not</strong> collect data directly from children under 13. All student information is
+      provided by a parent, legal guardian, or authorized school administrator. Parents may review,
+      modify, or delete their child's information at any time by emailing
+      <a href="mailto:privacy@tripzen.app">privacy@tripzen.app</a>.
+    </div>
+
+    <h2>4. Sharing &amp; Third Parties</h2>
+    <p>We do not sell your personal data. We share data only with:</p>
+    <ul>
+      <li><strong>Stripe</strong> — payment processing (<a href="https://stripe.com/privacy">privacy policy</a>)</li>
+      <li><strong>Apple Push Notification Service / Google FCM / Expo Push</strong> — delivering push notifications</li>
+      <li><strong>Twilio</strong> — SMS notifications, if enabled by your school operator</li>
+      <li><strong>Your school or bus operator</strong> — student records and ride history relevant to their service</li>
+      <li><strong>Law enforcement</strong> — only when required by valid legal process</li>
+    </ul>
+
+    <h2>5. Data Retention</h2>
+    <ul>
+      <li>Active accounts: kept while you use the app.</li>
+      <li>Trip and boarding logs: 12 months.</li>
+      <li>Payment records: 7 years (legal requirement).</li>
+      <li>Account deletion is processed within 30 days, except where law requires longer retention.</li>
+    </ul>
+
+    <h2>6. Your Rights</h2>
+    <p>Under GDPR, CCPA, and similar laws, you can:</p>
+    <ul>
+      <li>Access a copy of your personal data.</li>
+      <li>Correct inaccurate or incomplete data.</li>
+      <li>Request deletion ("right to be forgotten").</li>
+      <li>Export your data in machine-readable format (JSON).</li>
+      <li>Withdraw consent for non-essential data uses.</li>
+      <li>Lodge a complaint with your local data protection authority.</li>
+    </ul>
+    <p>To exercise these rights, email <a href="mailto:privacy@tripzen.app">privacy@tripzen.app</a>.</p>
+
+    <h2>7. Security</h2>
+    <ul>
+      <li>TLS 1.2+ encryption for all network traffic.</li>
+      <li>Passwords hashed with bcrypt.</li>
+      <li>JWT tokens with short expiry; refresh tokens stored securely.</li>
+      <li>Sensitive data stored using Expo SecureStore (Keychain / Keystore).</li>
+      <li>Regular security audits and dependency updates.</li>
+    </ul>
+
+    <h2>8. International Transfers</h2>
+    <p>
+      TripZen may process data outside your country of residence. We use Standard Contractual Clauses
+      and equivalent safeguards to protect international data transfers.
+    </p>
+
+    <h2>9. Changes to This Policy</h2>
+    <p>
+      We may update this policy from time to time. The "Last updated" date will reflect the most recent
+      changes. Material changes will be notified in-app and via email.
+    </p>
+
+    <h2>10. Contact Us</h2>
+    <div class="card">
+      <p><strong>TripZen Privacy Team</strong></p>
+      <p>Email: <a href="mailto:privacy@tripzen.app">privacy@tripzen.app</a></p>
+      <p>Support: <a href="mailto:support@tripzen.app">support@tripzen.app</a></p>
+      <p>Address: [Your registered company address]</p>
+    </div>
+  </main>
+
+  <footer>
+    &copy; 2025 TripZen. All rights reserved. ·
+    <a href="./index.html">Home</a> ·
+    <a href="./support.html">Support</a>
+  </footer>
+</body>
+</html>

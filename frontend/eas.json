@@ -9,7 +9,8 @@
       "distribution": "internal",
       "channel": "development",
       "env": {
-        "EXPO_PUBLIC_BACKEND_URL": "https://app-builder-demo-60.emergent.host"
+        "EXPO_PUBLIC_BACKEND_URL": "https://app-builder-demo-60.emergent.host",
+        "EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY": "pk_live_51Sc0NLRewvuGMSxSIGyvy6MnO0B05fV93PTfKvDuecaGrrUpA5qrYs9rQVesqsBaJDbAmKycQWrxQ3peLaJYm5kq00PGKIkbQI"
       },
       "ios": {
         "simulator": true
@@ -22,7 +23,8 @@
       "distribution": "internal",
       "channel": "preview",
       "env": {
-        "EXPO_PUBLIC_BACKEND_URL": "https://app-builder-demo-60.emergent.host"
+        "EXPO_PUBLIC_BACKEND_URL": "https://app-builder-demo-60.emergent.host",
+        "EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY": "pk_live_51Sc0NLRewvuGMSxSIGyvy6MnO0B05fV93PTfKvDuecaGrrUpA5qrYs9rQVesqsBaJDbAmKycQWrxQ3peLaJYm5kq00PGKIkbQI"
       },
       "ios": {
         "simulator": false
@@ -36,7 +38,8 @@
       "channel": "production",
       "autoIncrement": true,
       "env": {
-        "EXPO_PUBLIC_BACKEND_URL": "https://app-builder-demo-60.emergent.host"
+        "EXPO_PUBLIC_BACKEND_URL": "https://app-builder-demo-60.emergent.host",
+        "EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY": "pk_live_51Sc0NLRewvuGMSxSIGyvy6MnO0B05fV93PTfKvDuecaGrrUpA5qrYs9rQVesqsBaJDbAmKycQWrxQ3peLaJYm5kq00PGKIkbQI"
       },
       "ios": {
         "simulator": false
