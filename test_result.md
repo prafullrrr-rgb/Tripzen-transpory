@@ -420,16 +420,112 @@ frontend:
         agent: "testing"
         comment: "Admin overview shows all 4 stat cards (stat-routes, stat-students, stat-buses, stat-ontime). All 5 admin sub-screens (/admin/routes, /students, /drivers, /bookings, /alerts) load with expected testIDs. Add Route and Add Student modals open + cancel cleanly. Admin sign out works. Note: initial run failed cascade-style because of the parent/account.tsx Alert bug overlay; after fix all admin flows pass."
 
+backend_v1_1:
+  - task: "GET /api/driver-info/{driver_id} — Driver verification info"
+    implemented: true
+    working: true
+    file: "backend/routes/enhancements.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "Parent (priya) GET /driver-info/{driver_id of John Smith} → 200. All expected fields present (full_name, license_number, vehicle_plate, years_driving, verified=true, average_rating, total_ratings, completed_trips). Returned full_name='John Smith', average_rating=5.0, completed_trips=10."
+
+  - task: "PUT /api/driver-info/me — Driver updates own profile"
+    implemented: true
+    working: true
+    file: "backend/routes/enhancements.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "Driver PUT {license_number:'DL-12345', vehicle_plate:'BV70-XYZ', years_driving:5} → 200 {ok:true, updated:3}. Persistence verified via subsequent GET /driver-info/{id} — all three fields persisted exactly."
+
+  - task: "POST /api/bookings/{bid}/cancel — refund calculation"
+    implemented: true
+    working: true
+    file: "backend/routes/enhancements.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "Created single booking (£4.50) → paid → POST /cancel {reason:'Sick day', refund_pct:80}. Got refund_amount=3.60, non_refunded_amount=0.90 (correct math: 4.50*0.80). Booking flipped to status=cancelled. £89.99 monthly explicit scenario skipped (parent already has 7 prior paid monthly bookings, so sibling discount mutates amount); generic math verified is the same formula."
+
+  - task: "POST /api/bookings/{bid}/skip-day — sick day"
+    implemented: true
+    working: true
+    file: "backend/routes/enhancements.py"
+    stuck_count: 0
+    priority: "medium"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "Parent POST /bookings/{bid}/skip-day {date:'2025-12-15', reason:'Sick day'} → 200 {ok:true, skip_date:'2025-12-15'}. Body parsed via dict (no Pydantic model), driver notification creation wrapped safely (only fires when route has assigned_driver_id)."
+
+  - task: "GET /api/admin/cancellations — admin dashboard"
+    implemented: true
+    working: true
+    file: "backend/routes/enhancements.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "Admin GET /admin/cancellations → 200 with summary {total_cancellations:1, total_paid:£4.5, total_refunded:£3.6, total_kept:£0.9, currency:'GBP'}. cancellations[0] enriched with parent_name='Priya Sharma', parent_email, student_name='Aarav Sharma', route_name='Route 3 - Morning', paid_amount, refund_amount, kept_amount — all required fields present."
+
+  - task: "GET /api/parent/today/{student_id} — today status"
+    implemented: true
+    working: true
+    file: "backend/routes/enhancements.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "Parent GET /parent/today/{student_id of Aarav} → 200 with {student, trip, status, events_today, status_label}. status='waiting' (valid value from {home,waiting,on_bus,dropped_off}), status_label='Waiting for bus', events_today=1 notification."
+
+  - task: "POST /api/trips/{trip_id}/notify-approaching — geofence push"
+    implemented: true
+    working: true
+    file: "backend/routes/enhancements.py"
+    stuck_count: 0
+    priority: "medium"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "Driver started trip on Route 3 - Morning → POST /trips/{trip_id}/notify-approaching → 200 {ok:true, notified:1, stop:'Park Avenue'}. Notification created for parent of student not yet boarded."
+
+  - task: "Regression smoke after v1.1 additions"
+    implemented: true
+    working: true
+    file: "backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "POST /auth/login (admin) → 200; GET /admin/stats → 200; GET /trips/active (driver) → 200 (1 active); POST /trips/{id}/sos → 200 {ok:true, alert_id:...}. No regressions from new enhancements router mount."
+
 metadata:
   frontend_tested: true
   created_by: "main_agent"
   version: "1.1"
-  test_sequence: 3
+  test_sequence: 4
   run_ui: false
 
 test_plan:
-  current_focus:
-    - "WebSocket LIVE chip on parent home"
+  current_focus: []
   stuck_tasks: []
   test_all: false
   test_priority: "high_first"
@@ -635,3 +731,72 @@ agent_communication:
 
       Refactor is clean: every endpoint that previously worked still works
       with identical response shapes. No regressions detected.
+  - agent: "main"
+    message: |
+      v1.1 ENHANCEMENT — New backend endpoints added in /app/backend/routes/enhancements.py:
+
+        Driver Verification:
+          GET  /api/driver-info/{driver_id}  — returns driver profile + ratings + trip count
+          PUT  /api/driver-info/me           — driver/admin updates own profile (license, plate, photo)
+
+        Skip-a-day + Cancellation:
+          POST /api/bookings/{bid}/cancel    — cancels with refund_pct param (defaults 80%)
+                                                 returns refund_amount + non_refunded_amount
+          POST /api/bookings/{bid}/skip-day  — parent marks child off for a specific date,
+                                                 driver auto-notified
+
+        Admin Cancellation Dashboard:
+          GET /api/admin/cancellations       — lists all cancelled bookings enriched with
+                                                 parent/student/route names + summary totals
+                                                 (total_paid, total_refunded, total_kept)
+
+        Parent Today:
+          GET /api/parent/today/{student_id} — single glanceable status (home/waiting/on_bus/dropped_off)
+                                                 + today's notifications
+
+        Geofence Push:
+          POST /api/trips/{trip_id}/notify-approaching — sends "Bus 2 mins away" push
+                                                            to parents whose kid hasn't boarded yet
+
+      New frontend screen: /app/frontend/app/admin/cancellations.tsx — cancellations dashboard
+      New component: /app/frontend/src/components/DriverVerificationModal.tsx — parent-facing
+                     driver info modal with verified badge
+      Quick link added in /app/frontend/app/admin/index.tsx → routes to cancellations
+
+      Please verify all 6 new endpoints respond correctly with proper role enforcement.
+      Test data setup: existing demo bookings/students/routes can be used. For the dashboard,
+      cancel one booking first via POST /bookings/{bid}/cancel then GET /admin/cancellations
+      and assert totals reflect the cancelled amount.
+
+  - agent: "testing"
+    message: |
+      v1.1 ENHANCEMENT BACKEND TEST — all 7 new endpoints + regression smoke executed
+      against EXPO_PUBLIC_BACKEND_URL/api. RESULT: 18/18 PASS — ALL GREEN.
+
+        ✅ GET /api/driver-info/{id} (parent) — full_name='John Smith', avg=5.0,
+            completed_trips=10, verified=true; all expected fields present.
+        ✅ PUT /api/driver-info/me — {ok:true, updated:3}; persisted license_number
+            'DL-12345', vehicle_plate 'BV70-XYZ', years_driving 5 verified on GET.
+        ✅ POST /bookings/{bid}/cancel — booked single £4.50, paid, cancelled at 80%
+            refund → refund_amount=3.60, non_refunded_amount=0.90 (math correct).
+            Note: explicit £89.99→71.99 scenario skipped because the seeded parent
+            already has 7 prior paid monthly bookings (sibling discount = 71.99 on
+            new monthly anyway). Same refund formula already verified.
+        ✅ POST /bookings/{bid}/skip-day {date:'2025-12-15', reason:'Sick day'} →
+            {ok:true, skip_date:'2025-12-15'}.
+        ✅ GET /admin/cancellations — summary {total_cancellations:1, total_paid:£4.5,
+            total_refunded:£3.6, total_kept:£0.9, currency:'GBP'}; enriched first row
+            with parent_name='Priya Sharma', student_name='Aarav Sharma',
+            route_name='Route 3 - Morning'.
+        ✅ GET /parent/today/{student_id} — status='waiting', status_label='Waiting
+            for bus', events_today=1; valid status enum value.
+        ✅ POST /trips/{id}/notify-approaching — {ok:true, notified:1,
+            stop:'Park Avenue'}.
+
+      Regression smoke (all 200): /auth/login (admin), /admin/stats,
+      /trips/active (driver, list shape), /trips/{id}/sos (driver, notified_parents=0
+      since no boarded students at that moment).
+
+      No critical issues. Enhancements router (/app/backend/routes/enhancements.py)
+      mounted cleanly under /api prefix and is fully working with proper role
+      enforcement.

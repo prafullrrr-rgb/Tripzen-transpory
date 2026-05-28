@@ -19,7 +19,11 @@
         "NFCReaderUsageDescription": "Tap student NFC badges to mark boarding.",
         "NSPhotoLibraryUsageDescription": "Attach photos to incident reports.",
         "NSMicrophoneUsageDescription": "Record audio notes for incident reports.",
-        "UIBackgroundModes": ["location", "fetch", "remote-notification"],
+        "UIBackgroundModes": [
+          "location",
+          "fetch",
+          "remote-notification"
+        ],
         "ITSAppUsesNonExemptEncryption": false
       },
       "associatedDomains": []
@@ -89,7 +93,8 @@
           "isIosBackgroundLocationEnabled": true,
           "isAndroidBackgroundLocationEnabled": true
         }
-      ]
+      ],
+      "expo-font"
     ],
     "experiments": {
       "typedRoutes": true

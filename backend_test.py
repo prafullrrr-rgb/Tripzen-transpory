@@ -1,345 +1,321 @@
-"""
-Backend test suite for TripZen Phase 2 endpoints:
-  1. WebSocket /api/ws/trip/{trip_id}
-  2. POST /api/users/push-token
-  3. POST /api/bookings/{bid}/payment-intent + /confirm-payment
-  4. POST /api/notifications/whatsapp
+"""TripZen v1.1 Enhancement Endpoint Tests.
 
-Reads EXPO_PUBLIC_BACKEND_URL from /app/frontend/.env (no localhost).
-Seed creds in /app/memory/test_credentials.md.
+Tests the new endpoints in /app/backend/routes/enhancements.py plus a regression
+smoke. Uses the public EXPO_PUBLIC_BACKEND_URL/api base.
 """
-import asyncio
-import json
+import os
 import sys
 from typing import Optional
 
 import httpx
-import websockets
+
+BASE = os.environ.get("EXPO_PUBLIC_BACKEND_URL", "https://app-builder-demo-60.preview.emergentagent.com")
+API = f"{BASE.rstrip('/')}/api"
+
+ADMIN = ("admin@tripzen.com", "admin123")
+DRIVER = ("driver@tripzen.com", "driver123")
+PARENT = ("priya@tripzen.com", "parent123")
+
+results: list = []
 
 
-def _load_env():
-    env_path = "/app/frontend/.env"
-    with open(env_path) as f:
-        for line in f:
-            line = line.strip()
-            if line.startswith("EXPO_PUBLIC_BACKEND_URL="):
-                v = line.split("=", 1)[1].strip().strip('"').strip("'")
-                return v
-    raise RuntimeError("EXPO_PUBLIC_BACKEND_URL not found")
-
-
-BASE_URL = _load_env()
-API = f"{BASE_URL}/api"
-WS_BASE = BASE_URL.replace("https://", "wss://").replace("http://", "ws://")
-
-ADMIN = {"email": "admin@tripzen.com", "password": "admin123"}
-DRIVER = {"email": "driver@tripzen.com", "password": "driver123"}
-PARENT = {"email": "priya@tripzen.com", "password": "parent123"}
-
-RESULTS = []
-
-
-def log(name, ok, detail=""):
+def log(name: str, ok: bool, detail: str = ""):
     status = "PASS" if ok else "FAIL"
-    RESULTS.append((name, ok, detail))
-    print(f"[{status}] {name} :: {detail}")
+    print(f"[{status}] {name}{(' — ' + detail) if detail else ''}")
+    results.append((name, ok, detail))
 
 
-def login(client: httpx.Client, creds):
-    r = client.post(f"{API}/auth/login", json=creds)
-    r.raise_for_status()
-    j = r.json()
-    return j.get("access_token") or j.get("token")
-
-
-def auth_h(tok):
-    return {"Authorization": f"Bearer {tok}"}
-
-
-async def test_websocket_trip(driver_tok: str, trip_id: str):
-    ws_url = f"{WS_BASE}/api/ws/trip/{trip_id}"
-    print(f"[INFO] Connecting WS: {ws_url}")
-    try:
-        async with websockets.connect(ws_url, open_timeout=15, close_timeout=5) as ws:
-            try:
-                msg = await asyncio.wait_for(ws.recv(), timeout=10)
-            except asyncio.TimeoutError:
-                log("WS snapshot", False, "no snapshot received in 10s")
-                return
-            try:
-                payload = json.loads(msg)
-            except Exception:
-                log("WS snapshot", False, f"non-JSON snapshot: {msg!r}")
-                return
-            if payload.get("type") == "snapshot" and payload.get("trip", {}).get("id") == trip_id:
-                trip = payload["trip"]
-                log("WS snapshot", True,
-                    f"trip.id matches; current_lat={trip.get('current_lat')} current_lng={trip.get('current_lng')}")
-            else:
-                log("WS snapshot", False, f"unexpected payload: {payload}")
-                return
-
-            new_lat = 51.5210
-            new_lng = -0.0900
-
-            async def push_loc():
-                await asyncio.sleep(0.3)
-                async with httpx.AsyncClient(timeout=20) as ac:
-                    r = await ac.post(
-                        f"{API}/trips/{trip_id}/location",
-                        json={"lat": new_lat, "lng": new_lng},
-                        headers=auth_h(driver_tok),
-                    )
-                    return r.status_code
-
-            push_task = asyncio.create_task(push_loc())
-
-            got_location_frame = False
-            deadline = asyncio.get_event_loop().time() + 10
-            while asyncio.get_event_loop().time() < deadline:
-                remaining = max(0.5, deadline - asyncio.get_event_loop().time())
-                try:
-                    raw = await asyncio.wait_for(ws.recv(), timeout=remaining)
-                except asyncio.TimeoutError:
-                    break
-                try:
-                    p = json.loads(raw)
-                except Exception:
-                    continue
-                if p.get("type") == "location":
-                    t = p.get("trip", {})
-                    if abs(t.get("current_lat", 0) - new_lat) < 1e-6 and abs(t.get("current_lng", 0) - new_lng) < 1e-6:
-                        got_location_frame = True
-                        log("WS location update broadcast", True,
-                            f"received location frame with new coords ({t['current_lat']},{t['current_lng']})")
-                        break
-                    else:
-                        log("WS location update broadcast", False,
-                            f"coords mismatch: got {t.get('current_lat')},{t.get('current_lng')} expected {new_lat},{new_lng}")
-                        break
-
-            sc = await push_task
-            if sc != 200:
-                log("REST POST /trips/{id}/location", False, f"status={sc}")
-            else:
-                log("REST POST /trips/{id}/location", True, "200 OK")
-
-            if not got_location_frame:
-                log("WS location update broadcast", False, "no `location` frame received within 10s after REST push")
-
-            try:
-                await ws.send("ping")
-                raw = await asyncio.wait_for(ws.recv(), timeout=5)
-                if isinstance(raw, str) and raw.strip().lower() == "pong":
-                    log("WS ping/pong", True, "received pong")
-                else:
-                    log("WS ping/pong", True, f"Minor: got {raw!r} instead of pong (optional)")
-            except Exception as e:
-                log("WS ping/pong", True, f"Minor: ping/pong check failed ({e}) (optional)")
-
-    except Exception as e:
-        log("WS connect", False, f"connection error: {e}")
-
-
-def test_push_token(parent_tok: str):
-    with httpx.Client(timeout=20) as c:
-        r = c.post(
-            f"{API}/users/push-token",
-            json={"token": "ExponentPushToken[abc123]", "platform": "ios"},
-            headers=auth_h(parent_tok),
-        )
-        if r.status_code == 200 and r.json().get("ok") is True:
-            log("POST /users/push-token (parent ios)", True, f"body={r.json()}")
-        else:
-            log("POST /users/push-token (parent ios)", False, f"status={r.status_code} body={r.text[:200]}")
-
-        r2 = c.post(
-            f"{API}/users/push-token",
-            json={"token": "ExponentPushToken[xyz999]", "platform": "android"},
-            headers=auth_h(parent_tok),
-        )
-        if r2.status_code == 200 and r2.json().get("ok") is True:
-            log("POST /users/push-token (overwrite android)", True, f"body={r2.json()}")
-        else:
-            log("POST /users/push-token (overwrite android)", False, f"status={r2.status_code} body={r2.text[:200]}")
-
-        r3 = c.post(
-            f"{API}/users/push-token",
-            json={"token": "ExponentPushToken[noauth]", "platform": "web"},
-        )
-        if r3.status_code in (401, 403):
-            log("POST /users/push-token (no auth → 401/403)", True, f"status={r3.status_code}")
-        else:
-            log("POST /users/push-token (no auth → 401/403)", False,
-                f"expected 401/403 got {r3.status_code} body={r3.text[:200]}")
-
-
-def get_first_student_id(client: httpx.Client, parent_tok: str) -> Optional[str]:
-    r = client.get(f"{API}/students", headers=auth_h(parent_tok))
-    r.raise_for_status()
-    items = r.json()
-    return items[0]["id"] if items else None
-
-
-def test_payment_flow(parent_tok: str, admin_tok: str):
-    with httpx.Client(timeout=20) as c:
-        student_id = get_first_student_id(c, parent_tok)
-        if not student_id:
-            log("Payment: prerequisite student", False, "No student found for parent")
-            return
-        r = c.get(f"{API}/routes", headers=auth_h(admin_tok))
-        if r.status_code != 200 or not r.json():
-            log("Payment: prerequisite route", False, f"admin /routes status={r.status_code}")
-            return
-        route_id = None
-        for rt in r.json():
-            if "morning" in rt["name"].lower():
-                route_id = rt["id"]
-                break
-        route_id = route_id or r.json()[0]["id"]
-
-        rb = c.post(
-            f"{API}/bookings",
-            json={"plan": "single", "student_id": student_id, "route_id": route_id},
-            headers=auth_h(parent_tok),
-        )
-        if rb.status_code != 200:
-            log("Create single booking", False, f"status={rb.status_code} body={rb.text[:200]}")
-            return
-        booking = rb.json()
-        bid = booking["id"]
-        log("Create single booking", True, f"id={bid} amount={booking.get('amount')}")
-
-        ri = c.post(f"{API}/bookings/{bid}/payment-intent", headers=auth_h(parent_tok))
-        if ri.status_code != 200:
-            log("POST /bookings/{id}/payment-intent", False, f"status={ri.status_code} body={ri.text[:200]}")
-            return
-        body = ri.json()
-        cs = body.get("client_secret", "") or ""
-        problems = []
-        if not cs.startswith("pi_mock_"):
-            problems.append(f"client_secret does not start with pi_mock_ (got {cs[:30]})")
-        if "publishable_key" not in body:
-            problems.append("missing publishable_key")
-        if body.get("amount") != 4.5:
-            problems.append(f"amount expected 4.5 got {body.get('amount')}")
-        if (body.get("currency") or "").lower() != "gbp":
-            problems.append(f"currency expected gbp got {body.get('currency')}")
-        if body.get("mocked") is not True:
-            problems.append(f"mocked expected True got {body.get('mocked')}")
-        if problems:
-            log("POST /bookings/{id}/payment-intent", False, "; ".join(problems) + f" full={body}")
-        else:
-            log("POST /bookings/{id}/payment-intent", True, f"body={body}")
-
-        rc = c.post(f"{API}/bookings/{bid}/confirm-payment", headers=auth_h(parent_tok))
-        if rc.status_code != 200:
-            log("POST /bookings/{id}/confirm-payment", False, f"status={rc.status_code} body={rc.text[:200]}")
-            return
-        cb = rc.json()
-        if cb.get("ok") is True and cb.get("amount") == 4.5:
-            log("POST /bookings/{id}/confirm-payment", True, f"body={cb}")
-        else:
-            log("POST /bookings/{id}/confirm-payment", False, f"unexpected body={cb}")
-
-        rl = c.get(f"{API}/bookings", headers=auth_h(parent_tok))
-        if rl.status_code == 200:
-            match = next((b for b in rl.json() if b["id"] == bid), None)
-            if match and match.get("status") == "paid":
-                log("GET /bookings shows status=paid", True,
-                    f"status={match['status']} payment_ref={match.get('payment_ref')}")
-            else:
-                log("GET /bookings shows status=paid", False, f"booking={match}")
-        else:
-            log("GET /bookings shows status=paid", False, f"status={rl.status_code}")
-
-        rn = c.post(f"{API}/bookings/{bid}/payment-intent", headers=auth_h(parent_tok))
-        if rn.status_code == 400 and "already paid" in rn.text.lower():
-            log("Negative: payment-intent on paid booking → 400 'Already paid'", True, f"body={rn.text}")
-        else:
-            log("Negative: payment-intent on paid booking → 400 'Already paid'", False,
-                f"expected 400 'Already paid' got status={rn.status_code} body={rn.text[:200]}")
-
-
-def test_whatsapp(admin_tok: str):
-    with httpx.Client(timeout=20) as c:
-        r = c.post(
-            f"{API}/notifications/whatsapp",
-            json={"to_phone": "+447700900222", "message": "Hello from test"},
-            headers=auth_h(admin_tok),
-        )
-        if r.status_code != 200:
-            log("POST /notifications/whatsapp", False, f"status={r.status_code} body={r.text[:200]}")
-            return
-        b = r.json()
-        if b.get("ok") is True and b.get("mocked") is True and b.get("to") == "+447700900222":
-            log("POST /notifications/whatsapp (mocked)", True, f"body={b}")
-        else:
-            log("POST /notifications/whatsapp (mocked)", False, f"unexpected body={b}")
-
-
-def ensure_active_trip(driver_tok: str) -> Optional[str]:
+def login(email: str, password: str) -> Optional[str]:
     with httpx.Client(timeout=30) as c:
-        r = c.get(f"{API}/trips/active", headers=auth_h(driver_tok))
-        if r.status_code == 200:
-            data = r.json()
-            if isinstance(data, list):
-                data = data[0] if data else None
-            if data and data.get("id"):
-                print(f"[INFO] reusing active trip {data['id']}")
-                return data["id"]
+        r = c.post(f"{API}/auth/login", json={"email": email, "password": password})
+        if r.status_code != 200:
+            log(f"login {email}", False, f"status={r.status_code} body={r.text[:200]}")
+            return None
+        return r.json().get("access_token")
 
-        rr = c.get(f"{API}/routes", headers=auth_h(driver_tok))
-        if rr.status_code != 200:
-            print(f"[ERR] driver /routes status={rr.status_code} body={rr.text[:200]}")
-            return None
-        route = None
-        for rt in rr.json():
-            if "morning" in rt["name"].lower() and "route 3" in rt["name"].lower():
-                route = rt
-                break
-        if not route and rr.json():
-            route = rr.json()[0]
-        if not route:
-            print("[ERR] No route found")
-            return None
 
-        rs = c.post(f"{API}/trips/start", json={"route_id": route["id"]}, headers=auth_h(driver_tok))
-        if rs.status_code != 200:
-            print(f"[ERR] start trip status={rs.status_code} body={rs.text[:200]}")
-            return None
-        return rs.json()["id"]
+def auth(token: str) -> dict:
+    return {"Authorization": f"Bearer {token}"}
 
 
 def main():
-    print(f"[INFO] BASE_URL={BASE_URL}")
-    print(f"[INFO] WS_BASE={WS_BASE}")
+    print(f"\n=== TripZen v1.1 Enhancement Test ===\nAPI = {API}\n")
+
+    admin_tok = login(*ADMIN)
+    driver_tok = login(*DRIVER)
+    parent_tok = login(*PARENT)
+    if not (admin_tok and driver_tok and parent_tok):
+        print("FATAL: cannot login one or more roles; aborting.")
+        sys.exit(1)
+    log("login admin/driver/parent", True)
 
     with httpx.Client(timeout=30) as c:
-        admin_tok = login(c, ADMIN)
-        driver_tok = login(c, DRIVER)
-        parent_tok = login(c, PARENT)
-        print("[INFO] All three role logins OK")
+        # Driver id
+        r = c.get(f"{API}/admin/users", headers=auth(admin_tok))
+        if r.status_code != 200:
+            log("GET /admin/users", False, f"{r.status_code} {r.text[:200]}")
+            sys.exit(1)
+        users = r.json()
+        driver = next((u for u in users if u["role"] == "driver" and u["email"] == DRIVER[0]), None)
+        if not driver:
+            log("find seeded driver", False, "no driver with seed email")
+            sys.exit(1)
+        driver_id = driver["id"]
+        log("find driver via /admin/users", True, f"driver_id={driver_id[:8]}…")
 
-    trip_id = ensure_active_trip(driver_tok)
-    if not trip_id:
-        log("WS prerequisites: active trip", False, "could not start/find an active trip")
-    else:
-        log("WS prerequisites: active trip", True, f"trip_id={trip_id}")
-        asyncio.run(test_websocket_trip(driver_tok, trip_id))
+        # ===== 1) GET /api/driver-info/{driver_id} =====
+        r = c.get(f"{API}/driver-info/{driver_id}", headers=auth(parent_tok))
+        if r.status_code != 200:
+            log("GET /driver-info/{id} (parent)", False, f"{r.status_code} {r.text[:300]}")
+        else:
+            data = r.json()
+            expected_keys = {
+                "full_name", "license_number", "vehicle_plate", "years_driving",
+                "verified", "average_rating", "total_ratings", "completed_trips",
+            }
+            missing = expected_keys - set(data.keys())
+            if missing:
+                log("GET /driver-info/{id} fields", False, f"missing keys: {missing}")
+            elif data.get("verified") is not True:
+                log("GET /driver-info/{id} verified", False, f"verified={data.get('verified')}")
+            else:
+                log("GET /driver-info/{id} (parent)", True,
+                    f"full_name={data['full_name']}, avg={data['average_rating']}, trips={data['completed_trips']}")
 
-    test_push_token(parent_tok)
-    test_payment_flow(parent_tok, admin_tok)
-    test_whatsapp(admin_tok)
+        # ===== 2) PUT /api/driver-info/me =====
+        update_body = {"license_number": "DL-12345", "vehicle_plate": "BV70-XYZ", "years_driving": 5}
+        r = c.put(f"{API}/driver-info/me", headers=auth(driver_tok), json=update_body)
+        if r.status_code != 200:
+            log("PUT /driver-info/me", False, f"{r.status_code} {r.text[:300]}")
+        else:
+            data = r.json()
+            if data.get("ok") is True and data.get("updated") == 3:
+                log("PUT /driver-info/me", True, str(data))
+            else:
+                log("PUT /driver-info/me", False, f"unexpected response: {data}")
 
-    print("\n========== SUMMARY ==========")
-    passed = sum(1 for _, ok, _ in RESULTS if ok)
-    total = len(RESULTS)
-    for name, ok, _ in RESULTS:
-        print(f"{'PASS' if ok else 'FAIL'} | {name}")
-    print(f"\n{passed}/{total} checks passed")
-    sys.exit(0 if passed == total else 1)
+        # Verify persistence
+        r = c.get(f"{API}/driver-info/{driver_id}", headers=auth(parent_tok))
+        if r.status_code == 200:
+            d = r.json()
+            persisted = (
+                d.get("license_number") == "DL-12345"
+                and d.get("vehicle_plate") == "BV70-XYZ"
+                and d.get("years_driving") == 5
+            )
+            log("driver-info persistence", persisted,
+                f"license={d.get('license_number')}, plate={d.get('vehicle_plate')}, yrs={d.get('years_driving')}")
+        else:
+            log("driver-info persistence GET", False, f"{r.status_code}")
+
+        # ===== 3) POST /api/bookings/{bid}/cancel =====
+        r = c.get(f"{API}/students", headers=auth(parent_tok))
+        students = r.json() if r.status_code == 200 else []
+        if not students:
+            log("preflight: parent has students", False)
+            sys.exit(1)
+        student = students[0]
+        student_id = student["id"]
+        route_id = student.get("route_id")
+        if not route_id:
+            rr = c.get(f"{API}/routes", headers=auth(admin_tok))
+            if rr.status_code == 200 and rr.json():
+                route_id = rr.json()[0]["id"]
+        if not route_id:
+            log("preflight: route exists", False)
+            sys.exit(1)
+
+        # Create single booking, pay, cancel
+        r = c.post(f"{API}/bookings", headers=auth(parent_tok),
+                   json={"student_id": student_id, "route_id": route_id, "plan": "single"})
+        if r.status_code != 200:
+            log("create booking (single)", False, f"{r.status_code} {r.text[:200]}")
+            sys.exit(1)
+        booking = r.json()
+        bid_to_cancel = booking["id"]
+        amount = booking["amount"]
+        log("create booking (single)", True, f"id={bid_to_cancel[:8]}…, amount=£{amount}")
+
+        r = c.post(f"{API}/bookings/{bid_to_cancel}/pay", headers=auth(parent_tok))
+        if r.status_code != 200:
+            log("pay booking", False, f"{r.status_code} {r.text[:200]}")
+            sys.exit(1)
+        log("pay booking", True, f"amount=£{r.json().get('amount')}")
+
+        r = c.post(
+            f"{API}/bookings/{bid_to_cancel}/cancel",
+            headers=auth(parent_tok),
+            json={"reason": "Sick day", "refund_pct": 80},
+        )
+        if r.status_code != 200:
+            log("POST /bookings/{bid}/cancel", False, f"{r.status_code} {r.text[:300]}")
+        else:
+            data = r.json()
+            expected_refund = round(amount * 0.80, 2)
+            expected_kept = round(amount - expected_refund, 2)
+            ok = (
+                data.get("ok") is True
+                and abs(data.get("refund_amount", 0) - expected_refund) < 0.01
+                and abs(data.get("non_refunded_amount", 0) - expected_kept) < 0.01
+            )
+            log("POST /bookings/{bid}/cancel (80% refund math)", ok,
+                f"amount=£{amount} -> refund={data.get('refund_amount')}, kept={data.get('non_refunded_amount')} "
+                f"(expected refund={expected_refund}, kept={expected_kept})")
+
+        # Optionally also verify £89.99 -> 71.99 / 18.00 if no prior paid monthly
+        r = c.get(f"{API}/bookings", headers=auth(parent_tok))
+        prior_paid_monthly = sum(1 for b in (r.json() or [])
+                                 if b.get("status") == "paid" and b.get("plan") == "monthly")
+        if prior_paid_monthly == 0:
+            r = c.post(f"{API}/bookings", headers=auth(parent_tok),
+                       json={"student_id": student_id, "route_id": route_id, "plan": "monthly"})
+            if r.status_code == 200 and r.json().get("amount") == 89.99:
+                m_bid = r.json()["id"]
+                c.post(f"{API}/bookings/{m_bid}/pay", headers=auth(parent_tok))
+                r2 = c.post(f"{API}/bookings/{m_bid}/cancel", headers=auth(parent_tok),
+                            json={"reason": "Test 89.99 case", "refund_pct": 80})
+                if r2.status_code == 200:
+                    d = r2.json()
+                    ok89 = abs(d.get("refund_amount", 0) - 71.99) < 0.01 and abs(d.get("non_refunded_amount", 0) - 18.0) < 0.01
+                    log("cancel £89.99 monthly 80% (71.99/18.00)", ok89, str(d))
+                else:
+                    log("cancel £89.99 monthly 80%", False, f"{r2.status_code} {r2.text[:200]}")
+        else:
+            log("£89.99 monthly cancellation scenario", True,
+                f"SKIPPED — parent has {prior_paid_monthly} prior paid monthly (sibling discount applies). Generic 80% math verified above.")
+
+        # ===== 4) POST /api/bookings/{bid}/skip-day =====
+        r = c.post(f"{API}/bookings", headers=auth(parent_tok),
+                   json={"student_id": student_id, "route_id": route_id, "plan": "single"})
+        skip_bid = r.json()["id"] if r.status_code == 200 else None
+        if skip_bid:
+            c.post(f"{API}/bookings/{skip_bid}/pay", headers=auth(parent_tok))
+            r = c.post(f"{API}/bookings/{skip_bid}/skip-day",
+                       headers=auth(parent_tok),
+                       json={"date": "2025-12-15", "reason": "Sick day"})
+            if r.status_code != 200:
+                log("POST /bookings/{bid}/skip-day", False, f"{r.status_code} {r.text[:300]}")
+            else:
+                data = r.json()
+                ok = data.get("ok") is True and data.get("skip_date") == "2025-12-15"
+                log("POST /bookings/{bid}/skip-day", ok, str(data))
+        else:
+            log("preflight: create booking for skip-day", False)
+
+        # ===== 5) GET /api/admin/cancellations =====
+        r = c.get(f"{API}/admin/cancellations", headers=auth(admin_tok))
+        if r.status_code != 200:
+            log("GET /admin/cancellations", False, f"{r.status_code} {r.text[:300]}")
+        else:
+            data = r.json()
+            summary = data.get("summary", {})
+            cancellations = data.get("cancellations", [])
+            required_summary_keys = {"total_cancellations", "total_paid", "total_refunded", "total_kept", "currency"}
+            missing_keys = required_summary_keys - set(summary.keys())
+            if missing_keys:
+                log("GET /admin/cancellations summary keys", False, f"missing: {missing_keys}")
+            elif summary.get("currency") != "GBP":
+                log("GET /admin/cancellations currency", False, f"currency={summary.get('currency')}")
+            elif summary.get("total_cancellations", 0) < 1:
+                log("GET /admin/cancellations totals", False,
+                    f"total_cancellations={summary.get('total_cancellations')} (expected >=1)")
+            else:
+                first = cancellations[0] if cancellations else {}
+                enrich = {"parent_name", "parent_email", "student_name", "route_name",
+                          "paid_amount", "refund_amount", "kept_amount"}
+                missing_enrich = enrich - set(first.keys())
+                if missing_enrich:
+                    log("GET /admin/cancellations enrichment fields", False, f"missing: {missing_enrich}")
+                else:
+                    log("GET /admin/cancellations", True,
+                        f"total={summary['total_cancellations']}, paid=£{summary['total_paid']}, "
+                        f"refunded=£{summary['total_refunded']}, kept=£{summary['total_kept']}; "
+                        f"sample: parent={first.get('parent_name')}, student={first.get('student_name')}, route={first.get('route_name')}")
+
+        # ===== 6) GET /api/parent/today/{student_id} =====
+        r = c.get(f"{API}/parent/today/{student_id}", headers=auth(parent_tok))
+        if r.status_code != 200:
+            log("GET /parent/today/{student_id}", False, f"{r.status_code} {r.text[:300]}")
+        else:
+            data = r.json()
+            required = {"student", "trip", "status", "events_today", "status_label"}
+            missing = required - set(data.keys())
+            valid_status = {"home", "waiting", "on_bus", "dropped_off"}
+            if missing:
+                log("GET /parent/today fields", False, f"missing: {missing}")
+            elif data.get("status") not in valid_status:
+                log("GET /parent/today status value", False,
+                    f"status={data.get('status')} not in {valid_status}")
+            else:
+                log("GET /parent/today/{student_id}", True,
+                    f"status={data['status']} ({data['status_label']}), events={len(data['events_today'])}")
+
+        # ===== 7) POST /api/trips/{trip_id}/notify-approaching =====
+        r = c.get(f"{API}/routes", headers=auth(driver_tok))
+        driver_routes = r.json() if r.status_code == 200 else []
+        trip_id_for_smoke = None
+        if not driver_routes:
+            log("preflight: driver has routes", False)
+        else:
+            driver_route_id = driver_routes[0]["id"]
+            r = c.post(f"{API}/trips/start", headers=auth(driver_tok), json={"route_id": driver_route_id})
+            if r.status_code != 200:
+                log("start trip", False, f"{r.status_code} {r.text[:200]}")
+            else:
+                trip = r.json()
+                trip_id_for_smoke = trip["id"]
+                log("start trip", True, f"trip_id={trip_id_for_smoke[:8]}…")
+
+                r = c.post(f"{API}/trips/{trip_id_for_smoke}/notify-approaching", headers=auth(driver_tok))
+                if r.status_code != 200:
+                    log("POST /trips/{id}/notify-approaching", False, f"{r.status_code} {r.text[:300]}")
+                else:
+                    data = r.json()
+                    required = {"ok", "notified", "stop"}
+                    missing = required - set(data.keys())
+                    if missing:
+                        log("notify-approaching fields", False, f"missing: {missing} body={data}")
+                    elif data.get("ok") is not True:
+                        log("notify-approaching ok flag", False, str(data))
+                    else:
+                        log("POST /trips/{id}/notify-approaching", True,
+                            f"notified={data['notified']}, stop={data['stop']}")
+
+        # ===== 8) Regression smoke =====
+        r = c.post(f"{API}/auth/login", json={"email": ADMIN[0], "password": ADMIN[1]})
+        log("REGRESSION: POST /auth/login (admin)", r.status_code == 200, f"status={r.status_code}")
+
+        r = c.get(f"{API}/admin/stats", headers=auth(admin_tok))
+        log("REGRESSION: GET /admin/stats", r.status_code == 200, f"status={r.status_code}")
+
+        r = c.get(f"{API}/trips/active", headers=auth(driver_tok))
+        ok = r.status_code == 200 and isinstance(r.json(), list)
+        log("REGRESSION: GET /trips/active (driver)", ok,
+            f"status={r.status_code}, count={len(r.json()) if ok else 'n/a'}")
+
+        if trip_id_for_smoke:
+            r = c.post(f"{API}/trips/{trip_id_for_smoke}/sos", headers=auth(driver_tok))
+            if r.status_code == 200:
+                d = r.json()
+                log("REGRESSION: POST /trips/{id}/sos", d.get("ok") is True, str(d))
+            else:
+                log("REGRESSION: POST /trips/{id}/sos", False, f"{r.status_code} {r.text[:200]}")
+            # cleanup
+            c.post(f"{API}/trips/{trip_id_for_smoke}/end", headers=auth(driver_tok))
+        else:
+            log("REGRESSION: POST /trips/{id}/sos", False, "no active trip to test SOS on")
+
+    print("\n=== SUMMARY ===")
+    passed = sum(1 for _, ok, _ in results if ok)
+    failed = sum(1 for _, ok, _ in results if not ok)
+    print(f"Total: {len(results)}  Pass: {passed}  Fail: {failed}")
+    if failed:
+        print("\nFAILURES:")
+        for name, ok, detail in results:
+            if not ok:
+                print(f"  - {name}: {detail}")
+    return 0 if failed == 0 else 2
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

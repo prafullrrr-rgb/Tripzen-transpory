@@ -25,6 +25,7 @@ from routes.messages import router as messages_router
 from routes.parent import router as parent_router
 from routes.integrations import router as integrations_router
 from routes.support import router as support_router
+from routes.enhancements import router as enhancements_router
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("tripzen")
@@ -44,6 +45,7 @@ api.include_router(messages_router)
 api.include_router(parent_router)
 api.include_router(integrations_router)
 api.include_router(support_router)
+api.include_router(enhancements_router)
 app.include_router(api)
 
 

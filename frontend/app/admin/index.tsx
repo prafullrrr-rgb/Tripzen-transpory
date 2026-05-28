@@ -147,6 +147,23 @@ export default function AdminOverview() {
           <Ionicons name="arrow-forward" size={18} color={COLORS.textSecondary} />
         </TouchableOpacity>
 
+        {/* Cancellations dashboard quick link */}
+        <TouchableOpacity
+          testID="open-cancellations-btn"
+          style={styles.mapPreview}
+          onPress={() => router.push("/admin/cancellations")}
+          activeOpacity={0.85}
+        >
+          <View style={[styles.mapIconBox, { backgroundColor: COLORS.errorBg }]}>
+            <Ionicons name="close-circle" size={22} color={COLORS.error} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.mapTitle}>Cancellations & Refunds</Text>
+            <Text style={styles.mapSub}>Track cancelled bookings and non-refunded amounts</Text>
+          </View>
+          <Ionicons name="arrow-forward" size={18} color={COLORS.textSecondary} />
+        </TouchableOpacity>
+
         {/* Alerts */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Alerts</Text>
