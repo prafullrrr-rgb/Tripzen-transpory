@@ -800,3 +800,73 @@ agent_communication:
       No critical issues. Enhancements router (/app/backend/routes/enhancements.py)
       mounted cleanly under /api prefix and is fully working with proper role
       enforcement.
+
+  - agent: "main"
+    message: |
+      v1.1 SUBSCRIPTION SYSTEM added (/app/backend/routes/subscriptions.py):
+
+        Public:
+          GET  /api/plans                          — list all plans (optional ?track=school|operator|parent)
+          GET  /api/plans/{plan_id}                — single plan details
+
+        Admin only:
+          POST /api/subscriptions                  — start new subscription (auto 30-day trial)
+          GET  /api/subscriptions/me               — current org's subscription
+          POST /api/subscriptions/{sub_id}/upgrade — change plan
+          POST /api/subscriptions/{sub_id}/cancel  — cancel
+          POST /api/subscriptions/{sub_id}/activate — mark trial paid (would be Stripe webhook in prod)
+
+      Pricing tracks: school (Starter £199, Growth £499, Enterprise £1,499),
+                       operator (Solo £49, Fleet £39/bus, Enterprise Fleet £999),
+                       parent (Family £8.99/mo, £89.99/yr).
+      Annual billing = 20% discount baked into price_annual field.
+
+      New frontend: /app/frontend/app/admin/subscription.tsx — pricing page with track toggle,
+                    billing cycle toggle (monthly/annual), plan cards with "Most Popular" badge,
+                    "Start Free Trial" / "Switch to X" CTAs.
+
+      Quick link added on /app/frontend/app/admin/index.tsx → Subscription & Billing card.
+
+      Please verify:
+        1. GET /api/plans (no auth) returns 6 plans (3 school + 3 operator + 1 parent? actually
+           the parent plan is in there too — 7 total)
+        2. GET /api/plans?track=school returns exactly 3 school plans
+        3. POST /api/subscriptions as admin with body {plan_id:"school_growth", billing_cycle:"monthly"}
+           returns 201/200 with status="trial", trial_end ~30 days in future, amount=499.00
+        4. GET /api/subscriptions/me returns the subscription just created
+        5. POST /api/subscriptions/{id}/upgrade with {new_plan_id:"school_enterprise"} updates plan_name
+        6. POST /api/subscriptions/{id}/cancel returns ok=true and status flips to cancelled
+        7. Parent/driver cannot POST /api/subscriptions (require_roles("admin") enforcement)
+
+  - agent: "testing"
+    message: |
+      SUBSCRIPTION SYSTEM BACKEND TEST — /app/backend/routes/subscriptions.py
+      Executed /app/subscription_test.py against EXPO_PUBLIC_BACKEND_URL/api.
+      RESULT: 32/32 PASS — ALL GREEN.
+
+        ✅ GET /api/plans (no auth) → 200, trial_days=30, currency=GBP, plans length=7
+           (3 school + 3 operator + 1 parent). Each plan carries id, name, track,
+           price_monthly, price_annual, currency, features (array), highlight (bool).
+        ✅ GET /api/plans?track=school → 3 plans, all track=school. Verified
+           school_starter £199, school_growth £499 + highlight=true, school_enterprise £1499.
+        ✅ GET /api/plans?track=operator → 3 plans (fleet_solo, fleet_growth with
+           per_bus=true + highlight=true, fleet_enterprise).
+        ✅ GET /api/plans/school_growth → 200, price_monthly=499.00, price_annual=4790.00,
+           max_students=500.
+        ✅ POST /api/subscriptions (admin, {plan_id:'school_growth', billing_cycle:'monthly',
+           org_name:'Test School'}) → 200 with id, plan_id='school_growth', plan_name='Growth',
+           track='school', status='trial', amount=499.00, trial_end ~30 days in future
+           (delta_days=29 in UTC).
+        ✅ GET /api/subscriptions/me (admin) → 200 with subscription matching id just created
+           and trial_available=false.
+        ✅ POST /api/subscriptions/{id}/upgrade {new_plan_id:'school_enterprise',
+           billing_cycle:'annual'} → 200 {ok:true, new_plan:'Enterprise', amount:14390.00}.
+        ✅ POST /api/subscriptions/{id}/cancel → 200 {ok:true}. Subsequent GET /me
+           shows status='cancelled'.
+        ✅ Role enforcement: parent (priya@tripzen.com) POST /api/subscriptions → 403
+           {"detail":"Forbidden"}.
+        ✅ Duplicate-subscription guard: created a second sub after cancelling (trial),
+           then a third POST returned 400 {"detail":"Organization already has an active
+           subscription. Use /upgrade instead."} — exactly the expected behaviour.
+
+      No critical issues. Subscription router is production-ready under /api prefix.

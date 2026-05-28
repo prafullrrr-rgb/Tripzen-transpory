@@ -164,6 +164,23 @@ export default function AdminOverview() {
           <Ionicons name="arrow-forward" size={18} color={COLORS.textSecondary} />
         </TouchableOpacity>
 
+        {/* Subscription plan quick link */}
+        <TouchableOpacity
+          testID="open-subscription-btn"
+          style={styles.mapPreview}
+          onPress={() => router.push("/admin/subscription")}
+          activeOpacity={0.85}
+        >
+          <View style={[styles.mapIconBox, { backgroundColor: COLORS.accentLight }]}>
+            <Ionicons name="card" size={22} color={COLORS.primary} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.mapTitle}>Subscription & Billing</Text>
+            <Text style={styles.mapSub}>Manage your school plan, upgrade or downgrade</Text>
+          </View>
+          <Ionicons name="arrow-forward" size={18} color={COLORS.textSecondary} />
+        </TouchableOpacity>
+
         {/* Alerts */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Alerts</Text>
