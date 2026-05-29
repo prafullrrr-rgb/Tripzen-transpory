@@ -181,6 +181,23 @@ export default function AdminOverview() {
           <Ionicons name="arrow-forward" size={18} color={COLORS.textSecondary} />
         </TouchableOpacity>
 
+        {/* Broadcast quick link */}
+        <TouchableOpacity
+          testID="open-broadcast-btn"
+          style={styles.mapPreview}
+          onPress={() => router.push("/admin/broadcast")}
+          activeOpacity={0.85}
+        >
+          <View style={[styles.mapIconBox, { backgroundColor: COLORS.warningBg }]}>
+            <Ionicons name="megaphone" size={22} color={COLORS.warning} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.mapTitle}>Broadcast Message</Text>
+            <Text style={styles.mapSub}>Send snow day, delay, or custom alerts to all parents</Text>
+          </View>
+          <Ionicons name="arrow-forward" size={18} color={COLORS.textSecondary} />
+        </TouchableOpacity>
+
         {/* Alerts */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Alerts</Text>

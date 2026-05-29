@@ -1,8 +1,119 @@
-# 💰 TripZen Pricing Model — v2 (B2B Focused)
+# 💰 TripZen Pricing Model — STARTUP EDITION
 
 ## 🎯 Pricing Philosophy
 
-**Per-trip is wrong for B2B.** A 500-student school would pay £45k/month. Instead, we charge **per organization** (school or bus operator) with predictable monthly subscriptions. Parents pay nothing or a tiny family fee.
+**Per-trip is wrong for B2B. Enterprise pricing is wrong for startups.** Lowered all tiers to make first sales realistic for a brand-new product. We pre-set the higher prices for v2 when traction proves the model.
+
+---
+
+## 📊 THREE STARTUP-FRIENDLY PRICING TRACKS
+
+### 🏫 TRACK 1 — SCHOOL PLANS (primary revenue)
+
+| Plan | Price/month | Students | Buses | Best For |
+|---|---|---|---|---|
+| **Starter** | **£29 / mo** | up to 50 | up to 2 | Small primary schools |
+| **Growth** ⭐ | **£79 / mo** | up to 200 | up to 10 | Most independent / academies |
+| **Pro** | **£199 / mo** | up to 1,000 | up to 50 | Large multi-academy trusts |
+
+**Annual discount**: pay yearly = save ~17% (Growth £790/yr vs £948/mo).
+
+---
+
+### 🚌 TRACK 2 — BUS OPERATOR PLANS
+
+| Plan | Price | Buses | Best For |
+|---|---|---|---|
+| **Solo** | **£19 / mo** | 1 bus | Single-route owner-operators |
+| **Fleet** ⭐ | **£15 / bus / mo** | 5+ buses | Multi-bus operators |
+| **Pro Fleet** | **£299 / mo** flat | unlimited | Large fleets |
+
+Example: 10-bus operator = 10 × £15 = **£150/month** total
+
+---
+
+### 👨‍👩‍👧 TRACK 3 — DIRECT-TO-PARENT (when school doesn't pay)
+
+| Plan | Price | Includes |
+|---|---|---|
+| **Free** (NEW) | £0 | Live tracking only |
+| **Family** ⭐ | **£4.99 / mo** or **£49.99 / yr** | Up to 4 children, all features |
+
+---
+
+## 🧮 STARTUP REVENUE PROJECTIONS
+
+### Realistic Year 1 (5-15 schools)
+- 10 schools × Growth (£79/mo) × 12 = **£9,480/yr**
+- + 5 operators × £100 avg × 12 = £6,000/yr
+- + 100 direct families × £5 × 12 = £6,000/yr
+- **Total Y1 ARR: ~£21,500**
+
+### Year 2 (with PMF — 30-50 schools)
+- 40 schools × Growth (£79/mo) × 12 = **£37,920/yr**
+- + 20 operators × £150 × 12 = £36,000/yr
+- + 500 families × £5 × 12 = £30,000/yr
+- **Total Y2 ARR: ~£104,000**
+
+### Year 3 (scaling)
+- Mix of Starter/Growth/Pro = **£250k+ ARR target**
+
+---
+
+## 🆓 FREE TRIAL + ONBOARDING
+
+- **30-day free trial** for schools/operators (no credit card)
+- We help import students via CSV, create routes, train drivers
+- Free tier for parents = lead gen pipeline
+
+---
+
+## 🚀 WHEN TO RAISE PRICES?
+
+Trigger to move to v2 (Enterprise) pricing:
+- ≥ 50 paying schools
+- 90%+ customer retention
+- Stripe MRR > £10k
+
+Then introduce:
+- Growth → £149/mo
+- Pro → £399/mo
+- Add "Enterprise" tier at £999/mo (SSO, custom branding)
+
+---
+
+## 🔐 FEATURE GATING
+
+| Feature | Starter | Growth | Pro |
+|---|---|---|---|
+| Live tracking | ✅ | ✅ | ✅ |
+| QR boarding | ✅ | ✅ | ✅ |
+| Push notifications | ✅ | ✅ | ✅ |
+| Parent chat | ✅ | ✅ | ✅ |
+| Multi-language | ❌ | ✅ | ✅ |
+| Bulk CSV import | ❌ | ✅ | ✅ |
+| Broadcast templates | ❌ | ✅ | ✅ |
+| Revenue dashboard | ❌ | ✅ | ✅ |
+| AI weekly summaries | ❌ | ✅ | ✅ |
+| Custom branding | ❌ | ❌ | ✅ |
+| SSO | ❌ | ❌ | ✅ |
+| API access | ❌ | ❌ | ✅ |
+| Priority support | ❌ | ❌ | ✅ |
+
+---
+
+## ✅ SALES PITCH SCRIPT (for head teachers)
+
+> "Hi [Head Teacher]. We're TripZen — a child transport safety platform live on the App Store. For just **£79/month** (less than £3/day) your school gets:
+> - Real-time GPS for all your buses
+> - Instant parent notifications when their child boards
+> - Secure QR badge boarding system
+> - Full admin dashboard
+> 
+> Try it free for 30 days. No credit card. Cancel anytime. Can I set up a 15-min demo?"
+
+Easy "yes" because: <£100/month doesn't need board approval, free trial removes risk, App Store listing builds credibility.
+
 
 ---
 

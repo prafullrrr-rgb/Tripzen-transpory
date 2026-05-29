@@ -908,3 +908,79 @@ agent_communication:
 
       Backend testing focus: regression check that GET /api/plans still returns 7 plans with the
       NEW prices (school_starter £29, school_growth £79, etc). All existing endpoints unchanged.
+
+  - agent: "testing"
+    message: |
+      v1.1 Wave 3 BACKEND TEST — admin broadcast + QR badge endpoints + lowered prices
+      regression. Executed /app/broadcast_qr_test.py against EXPO_PUBLIC_BACKEND_URL/api.
+      RESULT: 15/15 PASS — ALL GREEN.
+
+        ✅ GET  /api/admin/broadcast/templates (admin) → 200, exactly 6 templates
+            {snow_day, strike_day, early_close, holiday_reminder, route_change, delay};
+            each carries id, title, body, icon.
+        ✅ POST /api/admin/broadcast {template_id:'snow_day'} → 200
+            {ok:true, sent:4, title:'❄️ Snow Day — Service Cancelled'};
+            sent count matches /admin/stats.total_parents (4).
+        ✅ POST /api/admin/broadcast custom {title:'Test Custom', body:'Hello parents',
+            icon:'megaphone'} → 200 {ok:true, sent:4, title:'Test Custom'}.
+        ✅ POST /api/admin/broadcast {} → 400 {"detail":"Either template_id or both
+            title+body required"}.
+        ✅ GET  /api/admin/students/qr-bulk (admin) → 200 {cards:[...], count:1};
+            each card has student_id, student_name, grade, school, qr_code, route_name.
+        ✅ GET  /api/admin/students/{id}/qr-card (admin) → 200; all 9 fields present
+            (student_id, student_name, grade, school, qr_code, route_name, parent_name,
+            parent_phone, issued_date). qr=TRIPZEN-17304D76.
+        ✅ Role enforcement: parent (priya) POST /admin/broadcast → 403; parent
+            GET /admin/broadcast/templates → 403. require_roles("admin") works.
+
+      Subscription pricing regression (NEW lowered prices, no auth required):
+        ✅ GET /api/plans?track=school →
+            school_starter price_monthly=29.00, price_annual=290.00
+            school_growth  price_monthly=79.00, price_annual=790.00, highlight=true
+            school_enterprise price_monthly=199.00, name='Pro'
+        ✅ GET /api/plans?track=operator →
+            fleet_solo price_monthly=19.00
+            fleet_growth price_monthly=15.00, per_bus=true
+            fleet_enterprise price_monthly=299.00, name='Pro Fleet'
+        ✅ GET /api/plans?track=parent →
+            parent_free price_monthly=0.00
+            parent_monthly price_monthly=4.99
+
+      Regression smoke: GET /api/auth/me (admin) → 200 role=admin;
+      GET /api/admin/stats → 200. No regressions.
+
+  - agent: "main"
+    message: |
+      v1.1 — Wave 3 changes:
+
+      BACKEND (/app/backend/routes/admin.py):
+        - GET  /api/admin/broadcast/templates       — returns 6 prebuilt templates (snow_day, strike_day,
+                                                       early_close, holiday_reminder, route_change, delay)
+        - POST /api/admin/broadcast                 — sends a broadcast notification to all parents
+                                                       (or filtered by route_id). Accepts either
+                                                       template_id OR title+body+icon. Returns {ok, sent, title}.
+        - GET  /api/admin/students/{id}/qr-card     — single student's printable QR badge data
+        - GET  /api/admin/students/qr-bulk          — all students' QR badge data (optional ?route_id filter)
+
+      FRONTEND:
+        - /app/frontend/app/admin/broadcast.tsx     — full Broadcast UI with template picker and
+                                                       custom message form (verified rendering)
+        - Quick link added on /app/frontend/app/admin/index.tsx → Broadcast Message card
+
+      PRICING ALSO LOWERED in /app/backend/routes/subscriptions.py:
+        Schools:   Starter £29/mo (was £199),  Growth £79/mo (was £499),  Pro £199/mo (was £1,499)
+        Operators: Solo £19/mo (was £49), Fleet £15/bus (was £39), Pro Fleet £299/mo (was £999)
+        Parent:    Free tier added (live tracking only), Family £4.99/mo (was £8.99)
+
+      Backend testing focus:
+        1. GET  /api/admin/broadcast/templates — auth as admin, expect 200 + 6 templates each with
+           id/title/body/icon
+        2. POST /api/admin/broadcast (template_id="snow_day") — expect {ok:true, sent: <N>, title}
+           where N = total parents in DB
+        3. POST /api/admin/broadcast (custom title/body) — expect 200, broadcast sent
+        4. POST /api/admin/broadcast (missing all params) — expect 400
+        5. GET  /api/admin/students/{some_id}/qr-card — expect 200 with QR card data
+        6. GET  /api/admin/students/qr-bulk — expect 200 with cards array
+        7. Non-admin (parent) cannot access any of the above — expect 403
+        8. REGRESSION: GET /api/plans?track=school now returns plans at NEW lower prices
+           (school_starter price_monthly=29, school_growth=79, school_enterprise=199)

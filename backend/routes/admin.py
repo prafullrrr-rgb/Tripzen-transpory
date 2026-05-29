@@ -1,14 +1,18 @@
-"""Admin: stats, users CRUD, revenue, alerts, incidents, CSV import."""
+"""Admin: stats, users CRUD, revenue, alerts, incidents, CSV import, broadcasts, QR PDFs."""
 import io
 import csv
 import uuid
-from typing import List
+import base64
+from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
+from fastapi.responses import StreamingResponse
+from pydantic import BaseModel
 
 from core.db import db
 from core.models import UserCreate
 from core.security import require_roles, hash_password, now_iso, now_utc
+from services.notifications import create_notification
 from .students import _get_first_parent_id
 
 router = APIRouter(tags=["admin"])
@@ -145,3 +149,127 @@ async def import_students(file: UploadFile = File(...), user: dict = Depends(req
         except Exception as e:
             errors.append(f"Row {i}: {e}")
     return {"created": created, "errors": errors}
+
+
+# ---------- Broadcast Templates ----------
+BROADCAST_TEMPLATES = {
+    "snow_day": {
+        "id": "snow_day",
+        "title": "❄️ Snow Day — Service Cancelled",
+        "body": "Due to severe weather, all school bus services are cancelled today. Please make alternative arrangements. Stay safe!",
+        "icon": "snow",
+    },
+    "strike_day": {
+        "id": "strike_day",
+        "title": "⚠️ Strike Action — Limited Service",
+        "body": "Due to industrial action, bus services may be delayed or cancelled today. We'll update you with the latest information.",
+        "icon": "warning",
+    },
+    "early_close": {
+        "id": "early_close",
+        "title": "🕐 Early School Closure",
+        "body": "School is closing early today. Pickup time has been adjusted. Please check your trip details for the new time.",
+        "icon": "time",
+    },
+    "holiday_reminder": {
+        "id": "holiday_reminder",
+        "title": "🎒 Half-Term Holiday Tomorrow",
+        "body": "No school bus tomorrow due to half-term break. Service resumes after the holiday.",
+        "icon": "calendar",
+    },
+    "route_change": {
+        "id": "route_change",
+        "title": "🚌 Route Change Today",
+        "body": "Your child's bus route has been updated due to roadworks. Please check the app for new pickup times.",
+        "icon": "git-branch",
+    },
+    "delay": {
+        "id": "delay",
+        "title": "⏰ Bus Delayed",
+        "body": "Today's bus is running approximately 15 minutes late due to traffic. Sorry for any inconvenience.",
+        "icon": "hourglass",
+    },
+}
+
+
+@router.get("/admin/broadcast/templates")
+async def list_broadcast_templates(user: dict = Depends(require_roles("admin"))):
+    return {"templates": list(BROADCAST_TEMPLATES.values())}
+
+
+class BroadcastBody(BaseModel):
+    template_id: Optional[str] = None
+    title: Optional[str] = None
+    body: Optional[str] = None
+    icon: Optional[str] = "megaphone"
+    route_id: Optional[str] = None  # if set, only parents of students on that route
+
+
+@router.post("/admin/broadcast")
+async def send_broadcast(body: BroadcastBody, user: dict = Depends(require_roles("admin"))):
+    """Send a broadcast notification to all parents (or filtered by route)."""
+    if body.template_id and body.template_id in BROADCAST_TEMPLATES:
+        tpl = BROADCAST_TEMPLATES[body.template_id]
+        title, content, icon = tpl["title"], tpl["body"], tpl["icon"]
+    else:
+        if not body.title or not body.body:
+            raise HTTPException(400, "Either template_id or both title+body required")
+        title, content, icon = body.title, body.body, body.icon or "megaphone"
+    # Filter parents
+    if body.route_id:
+        students = await db.students.find({"route_id": body.route_id}, {"_id": 0, "parent_id": 1, "id": 1}).to_list(500)
+        parent_ids = list({s["parent_id"] for s in students if s.get("parent_id")})
+    else:
+        parents = await db.users.find({"role": "parent"}, {"_id": 0, "id": 1}).to_list(2000)
+        parent_ids = [p["id"] for p in parents]
+    sent = 0
+    for pid in parent_ids:
+        try:
+            await create_notification(pid, None, "broadcast", title, content, icon=icon)
+            sent += 1
+        except Exception:
+            pass
+    return {"ok": True, "sent": sent, "title": title}
+
+
+# ---------- QR Badge PDF / Print ----------
+@router.get("/admin/students/{student_id}/qr-card")
+async def student_qr_card(student_id: str, user: dict = Depends(require_roles("admin"))):
+    """Return a single student's printable QR badge data (frontend renders as PDF/print)."""
+    student = await db.students.find_one({"id": student_id}, {"_id": 0})
+    if not student:
+        raise HTTPException(404, "Student not found")
+    route = await db.routes.find_one({"id": student.get("route_id")}, {"_id": 0}) if student.get("route_id") else None
+    parent = await db.users.find_one({"id": student.get("parent_id")}, {"_id": 0, "password_hash": 0})
+    return {
+        "student_id": student["id"],
+        "student_name": student.get("name"),
+        "grade": student.get("grade"),
+        "school": student.get("school"),
+        "qr_code": student.get("qr_code"),
+        "route_name": route.get("name") if route else "Unassigned",
+        "parent_name": parent.get("full_name") if parent else "",
+        "parent_phone": parent.get("phone") if parent else "",
+        "issued_date": now_iso(),
+    }
+
+
+@router.get("/admin/students/qr-bulk")
+async def students_qr_bulk(route_id: Optional[str] = None, user: dict = Depends(require_roles("admin"))):
+    """Return all students' QR badge data for bulk printing (filter by route optionally)."""
+    query = {}
+    if route_id:
+        query["route_id"] = route_id
+    students = await db.students.find(query, {"_id": 0}).to_list(500)
+    cards = []
+    for s in students:
+        route = await db.routes.find_one({"id": s.get("route_id")}, {"_id": 0}) if s.get("route_id") else None
+        cards.append({
+            "student_id": s["id"],
+            "student_name": s.get("name"),
+            "grade": s.get("grade"),
+            "school": s.get("school"),
+            "qr_code": s.get("qr_code"),
+            "route_name": route.get("name") if route else "Unassigned",
+        })
+    return {"cards": cards, "count": len(cards)}
