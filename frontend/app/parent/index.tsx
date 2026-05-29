@@ -19,6 +19,7 @@ import { useAuth } from "@/src/contexts/AuthContext";
 import { api } from "@/src/api/client";
 import { COLORS, SPACING, RADIUS } from "@/src/constants/theme";
 import { useLiveTrip } from "@/src/hooks/useLiveTrip";
+import { DriverVerificationModal } from "@/src/components/DriverVerificationModal";
 
 type Student = {
   id: string;
@@ -58,6 +59,7 @@ export default function ParentHome() {
   const [trips, setTrips] = useState<Trip[]>([]);
   const [routes, setRoutes] = useState<Record<string, Route>>({});
   const [refreshing, setRefreshing] = useState(false);
+  const [driverModalId, setDriverModalId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -331,6 +333,16 @@ export default function ParentHome() {
                 testID="quick-chat-btn"
               />
               <QuickAction
+                icon="shield-checkmark"
+                label="Driver Info"
+                onPress={() => {
+                  if (activeRoute?.driver_id) {
+                    setDriverModalId(activeRoute.driver_id);
+                  }
+                }}
+                testID="quick-driver-info-btn"
+              />
+              <QuickAction
                 icon="time"
                 label={t("parent.history")}
                 onPress={() => router.push("/parent/history")}
@@ -386,6 +398,11 @@ export default function ParentHome() {
           </>
         )}
       </ScrollView>
+      <DriverVerificationModal
+        visible={!!driverModalId}
+        driverId={driverModalId}
+        onClose={() => setDriverModalId(null)}
+      />
     </SafeAreaView>
   );
 }

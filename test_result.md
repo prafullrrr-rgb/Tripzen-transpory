@@ -870,3 +870,19 @@ agent_communication:
            subscription. Use /upgrade instead."} — exactly the expected behaviour.
 
       No critical issues. Subscription router is production-ready under /api prefix.
+
+  - agent: "main"
+    message: |
+      v1.1 — UI Integration Wave:
+
+      Parent home (/app/frontend/app/parent/index.tsx):
+        - Added 4th QuickAction "Driver Info" (icon: shield-checkmark) that opens
+          DriverVerificationModal for the active route's driver
+        - Imported DriverVerificationModal component
+        - Added driverModalId state + modal rendering at end of SafeAreaView
+
+      The DriverVerificationModal calls GET /api/driver-info/{driver_id} (verified working
+      in the previous batch) and shows: photo, license, plate, years driving, average rating,
+      total trips, verified badge.
+
+      No backend changes in this wave — pure UI plumbing using endpoints already tested.
