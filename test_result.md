@@ -984,3 +984,29 @@ agent_communication:
         7. Non-admin (parent) cannot access any of the above — expect 403
         8. REGRESSION: GET /api/plans?track=school now returns plans at NEW lower prices
            (school_starter price_monthly=29, school_growth=79, school_enterprise=199)
+
+  - agent: "main"
+    message: |
+      v1.1 — Wave 4 (UI integration of existing endpoints):
+
+      FRONTEND additions:
+        - /app/frontend/src/components/TodayCard.tsx — auto-refreshing (every 30s) status card showing
+          one of: home/waiting/on_bus/dropped_off with color-coded icon, status label, today's events count
+          and last 2 event titles. Uses GET /api/parent/today/{student_id}.
+        - /app/frontend/app/admin/qr-badges.tsx — bulk printable QR badge page with multi-select,
+          uses GET /api/admin/students/qr-bulk. Renders actual scannable QR codes via react-native-qrcode-svg.
+        - Parent home (/app/frontend/app/parent/index.tsx): plugged TodayCard for every child under
+          new "Today" section, above the "Your children" list.
+        - Admin home (/app/frontend/app/admin/index.tsx): added "Print QR Badges" quick link card.
+
+      Dependencies added (yarn expo install):
+        - react-native-qrcode-svg
+        - react-native-svg
+
+      All endpoints used were already backend-tested in earlier waves. This wave is pure UI plumbing
+      so no new backend testing required. Smoke check: parent home loads with TodayCard showing
+      "At home" status, admin QR badges page renders scannable QR codes for all students.
+
+      Verified screenshots:
+        - parent home: shows Today section with Aarav Sharma "At home" card
+        - admin/qr-badges: shows printable badge with QR code, name, year, route, badge ID

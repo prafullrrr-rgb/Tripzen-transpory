@@ -20,6 +20,7 @@ import { api } from "@/src/api/client";
 import { COLORS, SPACING, RADIUS } from "@/src/constants/theme";
 import { useLiveTrip } from "@/src/hooks/useLiveTrip";
 import { DriverVerificationModal } from "@/src/components/DriverVerificationModal";
+import { TodayCard } from "@/src/components/TodayCard";
 
 type Student = {
   id: string;
@@ -369,6 +370,12 @@ export default function ParentHome() {
                 <Text style={styles.aiFootnote}>{t("parent.aiByClaude")}</Text>
               </View>
             )}
+
+            {/* Today status cards (one per child) */}
+            <Text style={styles.sectionTitle}>Today</Text>
+            {students.map((s) => (
+              <TodayCard key={`today-${s.id}`} studentId={s.id} />
+            ))}
 
             {/* Children list */}
             <Text style={styles.sectionTitle}>{t("parent.yourChildren")}</Text>

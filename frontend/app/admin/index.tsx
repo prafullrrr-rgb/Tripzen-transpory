@@ -198,6 +198,23 @@ export default function AdminOverview() {
           <Ionicons name="arrow-forward" size={18} color={COLORS.textSecondary} />
         </TouchableOpacity>
 
+        {/* QR Badges print quick link */}
+        <TouchableOpacity
+          testID="open-qr-badges-btn"
+          style={styles.mapPreview}
+          onPress={() => router.push("/admin/qr-badges")}
+          activeOpacity={0.85}
+        >
+          <View style={[styles.mapIconBox, { backgroundColor: COLORS.bgTertiary }]}>
+            <Ionicons name="qr-code" size={22} color={COLORS.primary} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.mapTitle}>Print QR Badges</Text>
+            <Text style={styles.mapSub}>Bulk print student boarding badges (8 per A4)</Text>
+          </View>
+          <Ionicons name="arrow-forward" size={18} color={COLORS.textSecondary} />
+        </TouchableOpacity>
+
         {/* Alerts */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Alerts</Text>
