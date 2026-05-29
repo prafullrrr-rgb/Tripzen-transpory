@@ -64,6 +64,11 @@ export default function AdminLayout() {
       <Tabs.Screen name="students" options={{ href: null }} />
       <Tabs.Screen name="drivers" options={{ href: null }} />
       <Tabs.Screen name="bookings" options={{ href: null }} />
+      <Tabs.Screen name="broadcast" options={{ href: null }} />
+      <Tabs.Screen name="cancellations" options={{ href: null }} />
+      <Tabs.Screen name="qr-badges" options={{ href: null }} />
+      <Tabs.Screen name="subscription" options={{ href: null }} />
+      <Tabs.Screen name="import-students" options={{ href: null }} />
     </Tabs>
   );
 }

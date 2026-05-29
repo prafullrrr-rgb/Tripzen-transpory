@@ -61,6 +61,7 @@ export default function ParentLayout() {
         }}
       />
       <Tabs.Screen name="booking" options={{ href: null }} />
+      <Tabs.Screen name="add-child" options={{ href: null }} />
     </Tabs>
   );
 }
