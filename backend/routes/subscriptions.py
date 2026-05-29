@@ -16,42 +16,42 @@ router = APIRouter(tags=["subscriptions"])
 
 # ----- Pricing catalog (single source of truth) -----
 PLANS = {
-    # School plans
+    # School plans - startup-friendly pricing
     "school_starter": {
         "id": "school_starter", "name": "Starter", "track": "school",
-        "price_monthly": 199.00, "price_annual": 1990.00,
-        "max_students": 100, "max_buses": 5, "currency": "GBP",
+        "price_monthly": 29.00, "price_annual": 290.00,
+        "max_students": 50, "max_buses": 2, "currency": "GBP",
         "features": ["live_tracking", "qr_boarding", "push", "chat", "incidents"],
         "highlight": False,
     },
     "school_growth": {
         "id": "school_growth", "name": "Growth", "track": "school",
-        "price_monthly": 499.00, "price_annual": 4790.00,
-        "max_students": 500, "max_buses": 25, "currency": "GBP",
+        "price_monthly": 79.00, "price_annual": 790.00,
+        "max_students": 200, "max_buses": 10, "currency": "GBP",
         "features": ["live_tracking", "qr_boarding", "push", "chat", "incidents",
                      "multi_language", "csv_import", "broadcast", "revenue_dash", "ai_summaries"],
         "highlight": True,  # "Most Popular"
     },
     "school_enterprise": {
-        "id": "school_enterprise", "name": "Enterprise", "track": "school",
-        "price_monthly": 1499.00, "price_annual": 14390.00,
-        "max_students": -1, "max_buses": -1, "currency": "GBP",
+        "id": "school_enterprise", "name": "Pro", "track": "school",
+        "price_monthly": 199.00, "price_annual": 1990.00,
+        "max_students": 1000, "max_buses": 50, "currency": "GBP",
         "features": ["live_tracking", "qr_boarding", "push", "chat", "incidents",
                      "multi_language", "csv_import", "broadcast", "revenue_dash", "ai_summaries",
                      "custom_branding", "sso", "api_access", "priority_support"],
         "highlight": False,
     },
-    # Bus operator plans
+    # Bus operator plans - startup pricing
     "fleet_solo": {
         "id": "fleet_solo", "name": "Solo Operator", "track": "operator",
-        "price_monthly": 49.00, "price_annual": 490.00,
+        "price_monthly": 19.00, "price_annual": 190.00,
         "max_buses": 1, "currency": "GBP",
         "features": ["live_tracking", "qr_boarding", "push", "chat", "incidents"],
         "highlight": False,
     },
     "fleet_growth": {
         "id": "fleet_growth", "name": "Fleet", "track": "operator",
-        "price_monthly": 39.00, "per_bus": True, "min_buses": 5,
+        "price_monthly": 15.00, "per_bus": True, "min_buses": 5,
         "price_annual": None,  # billed per bus
         "max_buses": -1, "currency": "GBP",
         "features": ["live_tracking", "qr_boarding", "push", "chat", "incidents",
@@ -59,20 +59,27 @@ PLANS = {
         "highlight": True,
     },
     "fleet_enterprise": {
-        "id": "fleet_enterprise", "name": "Enterprise Fleet", "track": "operator",
-        "price_monthly": 999.00, "price_annual": 9590.00,
+        "id": "fleet_enterprise", "name": "Pro Fleet", "track": "operator",
+        "price_monthly": 299.00, "price_annual": 2990.00,
         "max_buses": -1, "currency": "GBP",
         "features": ["live_tracking", "qr_boarding", "push", "chat", "incidents",
                      "multi_language", "vehicle_logs", "custom_branding", "api_access", "priority_support"],
         "highlight": False,
     },
-    # Direct-to-parent (legacy / fallback)
+    # Direct-to-parent
+    "parent_free": {
+        "id": "parent_free", "name": "Free", "track": "parent",
+        "price_monthly": 0.00, "price_annual": 0.00,
+        "max_children": 1, "currency": "GBP",
+        "features": ["live_tracking"],
+        "highlight": False,
+    },
     "parent_monthly": {
-        "id": "parent_monthly", "name": "Family Monthly", "track": "parent",
-        "price_monthly": 8.99, "price_annual": 89.99,
+        "id": "parent_monthly", "name": "Family", "track": "parent",
+        "price_monthly": 4.99, "price_annual": 49.99,
         "max_children": 4, "currency": "GBP",
         "features": ["live_tracking", "push", "chat"],
-        "highlight": False,
+        "highlight": True,
     },
 }
 

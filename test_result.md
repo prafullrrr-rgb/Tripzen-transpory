@@ -886,3 +886,25 @@ agent_communication:
       total trips, verified badge.
 
       No backend changes in this wave — pure UI plumbing using endpoints already tested.
+
+  - agent: "main"
+    message: |
+      v1.1 — Wave 2 changes:
+
+      1. STARTUP-FRIENDLY PRICING (lowered all subscription prices in /app/backend/routes/subscriptions.py):
+         Schools:   Starter £29/mo (was £199),  Growth £79/mo (was £499),  Pro £199/mo (was £1,499)
+         Operators: Solo £19/mo (was £49), Fleet £15/bus (was £39), Pro Fleet £299/mo (was £999)
+         Parent:    Free tier added (live tracking only), Family £4.99/mo (was £8.99)
+         Updated max_students/max_buses limits accordingly to be realistic for those prices.
+
+      2. PARENT HISTORY screen (/app/frontend/app/parent/history.tsx) — full rewrite to add:
+         - Skip-a-Day button on each PAID booking → calls POST /api/bookings/{id}/skip-day
+         - Cancel button on each PAID booking → calls POST /api/bookings/{id}/cancel with confirmation
+           showing exact refund amount (80%) and non-refundable amount (20%)
+         - CANCELLED status badge (red) when cancelled
+         - Refund/Non-refundable breakdown card shown on cancelled bookings
+         - Skip dates list shown on bookings with skip_dates array
+         - All wired to existing endpoints from earlier batch (no new backend needed)
+
+      Backend testing focus: regression check that GET /api/plans still returns 7 plans with the
+      NEW prices (school_starter £29, school_growth £79, etc). All existing endpoints unchanged.
