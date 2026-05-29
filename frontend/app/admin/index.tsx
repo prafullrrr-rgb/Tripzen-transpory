@@ -215,6 +215,23 @@ export default function AdminOverview() {
           <Ionicons name="arrow-forward" size={18} color={COLORS.textSecondary} />
         </TouchableOpacity>
 
+        {/* CSV Import quick link */}
+        <TouchableOpacity
+          testID="open-import-btn"
+          style={styles.mapPreview}
+          onPress={() => router.push("/admin/import-students")}
+          activeOpacity={0.85}
+        >
+          <View style={[styles.mapIconBox, { backgroundColor: COLORS.successBg }]}>
+            <Ionicons name="cloud-upload" size={22} color={COLORS.success} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.mapTitle}>Bulk Import Students</Text>
+            <Text style={styles.mapSub}>Upload CSV to add many students at once</Text>
+          </View>
+          <Ionicons name="arrow-forward" size={18} color={COLORS.textSecondary} />
+        </TouchableOpacity>
+
         {/* Alerts */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Alerts</Text>

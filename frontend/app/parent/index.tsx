@@ -378,7 +378,17 @@ export default function ParentHome() {
             ))}
 
             {/* Children list */}
-            <Text style={styles.sectionTitle}>{t("parent.yourChildren")}</Text>
+            <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginTop: SPACING.md }}>
+              <Text style={styles.sectionTitle}>{t("parent.yourChildren")}</Text>
+              <TouchableOpacity
+                onPress={() => router.push("/parent/add-child")}
+                testID="add-child-btn"
+                style={{ flexDirection: "row", alignItems: "center", gap: 4 }}
+              >
+                <Ionicons name="add-circle" size={18} color={COLORS.accent} />
+                <Text style={{ color: COLORS.accent, fontWeight: "700", fontSize: 13 }}>Add Child</Text>
+              </TouchableOpacity>
+            </View>
             {students.map((s) => (
               <View key={s.id} style={styles.studentCard} testID={`student-card-${s.id}`}>
                 <Image
