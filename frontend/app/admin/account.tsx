@@ -33,6 +33,50 @@ export default function AdminAccount() {
     router.replace("/login");
   };
 
+  const handleDeleteAccount = () => {
+    Alert.alert(
+      "Delete Account?",
+      "This will permanently delete your TripZen admin account and personal data. Audit logs and broadcasts will be retained but anonymised. This action cannot be undone.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete Account",
+          style: "destructive",
+          onPress: () => {
+            Alert.alert(
+              "Confirm permanent deletion",
+              "Are you absolutely sure? You will be signed out immediately and your account cannot be recovered.",
+              [
+                { text: "Keep my account", style: "cancel" },
+                {
+                  text: "Yes, delete forever",
+                  style: "destructive",
+                  onPress: async () => {
+                    try {
+                      await api.delete("/account");
+                      await signOut();
+                      router.replace("/login");
+                      setTimeout(
+                        () =>
+                          Alert.alert(
+                            "Account deleted",
+                            "Your TripZen account and personal data have been permanently removed.",
+                          ),
+                        400,
+                      );
+                    } catch (e: any) {
+                      Alert.alert("Delete failed", e.message || "Try again later");
+                    }
+                  },
+                },
+              ],
+            );
+          },
+        },
+      ],
+    );
+  };
+
   const pickLang = async (code: string) => {
     await setLanguage(code);
     setCurrentLang(code);
@@ -183,6 +227,21 @@ export default function AdminAccount() {
           }
         />
 
+        <Text style={styles.section}>Account & Privacy</Text>
+        <TouchableOpacity
+          testID="admin-delete-account-btn"
+          style={styles.deleteBtn}
+          activeOpacity={0.8}
+          onPress={handleDeleteAccount}
+        >
+          <Ionicons name="trash" size={18} color={COLORS.error} />
+          <Text style={styles.deleteText}>Delete Account</Text>
+          <Ionicons name="chevron-forward" size={18} color={COLORS.error} />
+        </TouchableOpacity>
+        <Text style={styles.deleteHint}>
+          Permanently delete your administrator account and personal data. Audit data is anonymised.
+        </Text>
+
         <TouchableOpacity
           testID="admin-signout-btn"
           style={styles.signoutBtn}
@@ -278,6 +337,9 @@ const styles = StyleSheet.create({
   menuRight: { fontSize: 12, color: COLORS.textSecondary, marginRight: 6 },
   signoutBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: COLORS.errorBg, padding: SPACING.md, borderRadius: RADIUS.md, marginTop: SPACING.lg },
   signoutText: { color: COLORS.error, fontWeight: "700", fontSize: 14 },
+  deleteBtn: { flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: COLORS.bg, padding: SPACING.md, borderRadius: RADIUS.md, borderWidth: 1.5, borderColor: COLORS.error },
+  deleteText: { flex: 1, color: COLORS.error, fontWeight: "700", fontSize: 14 },
+  deleteHint: { fontSize: 11, color: COLORS.textSecondary, marginTop: 6, marginBottom: 4, lineHeight: 16 },
   footer: { textAlign: "center", fontSize: 11, color: COLORS.textSecondary, marginTop: SPACING.lg },
   modalOverlay: { flex: 1, backgroundColor: "rgba(15, 27, 61, 0.5)", justifyContent: "flex-end" },
   modal: { backgroundColor: COLORS.bg, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: SPACING.lg, paddingBottom: 28 },

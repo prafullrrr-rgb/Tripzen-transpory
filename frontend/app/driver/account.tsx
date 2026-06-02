@@ -47,6 +47,50 @@ export default function DriverAccount() {
     router.replace("/login");
   };
 
+  const handleDeleteAccount = () => {
+    Alert.alert(
+      "Delete Account?",
+      "This will permanently delete your TripZen driver account and personal data. Your route history will be anonymised. This action cannot be undone.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete Account",
+          style: "destructive",
+          onPress: () => {
+            Alert.alert(
+              "Confirm permanent deletion",
+              "Are you absolutely sure? You will be signed out immediately and your account cannot be recovered.",
+              [
+                { text: "Keep my account", style: "cancel" },
+                {
+                  text: "Yes, delete forever",
+                  style: "destructive",
+                  onPress: async () => {
+                    try {
+                      await api.delete("/account");
+                      await signOut();
+                      router.replace("/login");
+                      setTimeout(
+                        () =>
+                          Alert.alert(
+                            "Account deleted",
+                            "Your TripZen account and personal data have been permanently removed.",
+                          ),
+                        400,
+                      );
+                    } catch (e: any) {
+                      Alert.alert("Delete failed", e.message || "Try again later");
+                    }
+                  },
+                },
+              ],
+            );
+          },
+        },
+      ],
+    );
+  };
+
   const openSupportChat = async () => {
     try {
       const res = await api.get<{ contact: { id: string; full_name: string } | null }>(
@@ -155,6 +199,21 @@ export default function DriverAccount() {
             })
           }
         />
+
+        <Text style={styles.section}>Account & Privacy</Text>
+        <TouchableOpacity
+          testID="driver-delete-account-btn"
+          style={styles.deleteBtn}
+          activeOpacity={0.8}
+          onPress={handleDeleteAccount}
+        >
+          <Ionicons name="trash" size={18} color={COLORS.error} />
+          <Text style={styles.deleteText}>Delete Account</Text>
+          <Ionicons name="chevron-forward" size={18} color={COLORS.error} />
+        </TouchableOpacity>
+        <Text style={styles.deleteHint}>
+          Permanently delete your account and personal data. Route history is anonymised.
+        </Text>
 
         <TouchableOpacity
           testID="driver-signout-btn"
@@ -284,4 +343,16 @@ const styles = StyleSheet.create({
     marginTop: SPACING.lg,
   },
   signoutText: { color: COLORS.error, fontWeight: "700", fontSize: 14 },
+  deleteBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    backgroundColor: COLORS.bg,
+    padding: SPACING.md,
+    borderRadius: RADIUS.md,
+    borderWidth: 1.5,
+    borderColor: COLORS.error,
+  },
+  deleteText: { flex: 1, color: COLORS.error, fontWeight: "700", fontSize: 14 },
+  deleteHint: { fontSize: 11, color: COLORS.textSecondary, marginTop: 6, marginBottom: 4, lineHeight: 16 },
 });

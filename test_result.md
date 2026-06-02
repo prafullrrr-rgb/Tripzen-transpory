@@ -530,6 +530,41 @@ test_plan:
   test_all: false
   test_priority: "high_first"
 
+backend_v1_2:
+  - task: "DELETE /api/account universal account deletion (Apple 5.1.1(v))"
+    implemented: true
+    working: true
+    file: "backend/routes/account.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: |
+          Full E2E verified via /app/account_delete_test.py against
+          EXPO_PUBLIC_BACKEND_URL/api. RESULT: 38/38 PASS.
+
+          Per-role flow (register fresh → /auth/me OK → DELETE /account → /auth/me 401 → re-login 401):
+            ✅ PARENT (delete-test-parent-*@tripzen.com): 200, ok=true, deleted_at iso,
+                summary={role:'parent', children:0, bookings:0, ratings:0,
+                notifications:N, messages:N, devices:N, notification_prefs:N,
+                user_deleted:true}. /auth/me with same token → 401, login → 401.
+                GET /students pre-delete returned [] (empty list, auth works).
+            ✅ DRIVER (delete-test-driver-*@tripzen.com): 200, summary contains
+                unassigned_routes_trips=true plus common counters. Token revoked,
+                login fails 401.
+            ✅ ADMIN (delete-test-admin-*@tripzen.com): 200, summary contains
+                anonymised_broadcasts=true plus common counters. Token revoked,
+                login fails 401.
+
+          Authorization:
+            ✅ DELETE /api/account with NO Authorization header → 401.
+            ✅ DELETE /api/account with invalid Bearer token → 401.
+
+          No critical issues. Endpoint is production-ready for Apple App Store
+          guideline 5.1.1(v) compliance.
+
 agent_communication:
   - agent: "main"
     message: |

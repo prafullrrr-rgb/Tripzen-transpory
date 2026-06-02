@@ -35,6 +35,50 @@ export default function ParentAccount() {
     router.replace("/login");
   };
 
+  const handleDeleteAccount = () => {
+    Alert.alert(
+      "Delete Account?",
+      "This will permanently delete your TripZen account, your children's profiles, bookings, messages and ratings. Active bookings will not be refunded. This action cannot be undone.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete Account",
+          style: "destructive",
+          onPress: () => {
+            Alert.alert(
+              "Confirm permanent deletion",
+              "Are you absolutely sure? You will be signed out immediately and your account cannot be recovered.",
+              [
+                { text: "Keep my account", style: "cancel" },
+                {
+                  text: "Yes, delete forever",
+                  style: "destructive",
+                  onPress: async () => {
+                    try {
+                      await api.delete("/account");
+                      await signOut();
+                      router.replace("/login");
+                      setTimeout(
+                        () =>
+                          Alert.alert(
+                            "Account deleted",
+                            "Your TripZen account and personal data have been permanently removed.",
+                          ),
+                        400,
+                      );
+                    } catch (e: any) {
+                      Alert.alert("Delete failed", e.message || "Try again later");
+                    }
+                  },
+                },
+              ],
+            );
+          },
+        },
+      ],
+    );
+  };
+
   const pickLang = async (code: string) => {
     await setLanguage(code);
     setCurrentLang(code);
@@ -158,30 +202,7 @@ export default function ParentAccount() {
           icon="trash"
           label="Delete My Account"
           testID="menu-gdpr-delete"
-          onPress={() =>
-            setInfoSheet({
-              icon: "warning",
-              iconColor: COLORS.error,
-              title: "Delete Account?",
-              subtitle: "This is permanent",
-              body:
-                "Deleting your account removes all children, bookings, messages and ratings. This cannot be undone.",
-              bullets: [
-                { icon: "alert-circle", title: "Loss of data", body: "Active bookings will not be refunded." },
-                { icon: "time", title: "30-day grace", body: "Contact support within 30 days to recover." },
-              ],
-              primaryLabel: "I understand — Delete",
-              onPrimary: async () => {
-                try {
-                  await api.delete("/parent/account");
-                  await signOut();
-                  router.replace("/login");
-                } catch (e: any) {
-                  Alert.alert("Failed", e.message);
-                }
-              },
-            })
-          }
+          onPress={handleDeleteAccount}
         />
 
         <Text style={styles.sectionTitle}>Support</Text>
