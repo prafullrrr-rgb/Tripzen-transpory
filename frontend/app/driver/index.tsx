@@ -374,7 +374,7 @@ export default function DriverHome() {
         {/* Available routes */}
         {!activeTrip && (
           <>
-            <Text style={styles.sectionTitle}>Today's routes</Text>
+            <Text style={styles.sectionTitle}>Today&apos;s routes</Text>
             {routes.length === 0 ? (
               <View style={styles.empty}>
                 <Ionicons name="map-outline" size={40} color={COLORS.textSecondary} />

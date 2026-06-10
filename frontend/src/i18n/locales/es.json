@@ -31,7 +31,7 @@
     "onTheWay": "En camino", "liveTracking": "Seguimiento en vivo",
     "bookTrip": "Reservar Viaje", "chatDriver": "Chatear Conductor",
     "history": "Historial", "weeklySummary": "Esta semana con {{name}}",
-    "aiByClaude": "✨ Generado por Claude", "yourChildren": "Tus hijos",
+    "aiByClaude": "✨ Resumen generado por IA", "yourChildren": "Tus hijos",
     "schoolNotSet": "Escuela sin definir"
   },
   "driver": {

@@ -67,7 +67,7 @@ export default function AddChild() {
           <Text style={styles.hero}>Add another child to your family</Text>
           <Text style={styles.heroSub}>Siblings can share one account. Each gets their own QR badge.</Text>
 
-          <Text style={styles.label}>Child's Full Name *</Text>
+          <Text style={styles.label}>Child&apos;s Full Name *</Text>
           <TextInput
             value={name}
             onChangeText={setName}

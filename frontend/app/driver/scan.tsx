@@ -178,7 +178,7 @@ export default function DriverScan() {
             <Ionicons name="qr-code" size={64} color={COLORS.primary} />
             <Text style={styles.manualTitle}>Enter QR code manually</Text>
             <Text style={styles.manualSub}>
-              Camera scanning isn't available on web preview. Use the test code below.
+              Camera scanning isn&apos;t available on web preview. Use the test code below.
             </Text>
             <TextInput
               testID="manual-qr-input"

@@ -29,7 +29,7 @@
     "onTheWay": "रास्ते में", "liveTracking": "लाइव ट्रैकिंग",
     "bookTrip": "यात्रा बुक करें", "chatDriver": "चालक से चैट",
     "history": "इतिहास", "weeklySummary": "{{name}} के साथ इस सप्ताह",
-    "aiByClaude": "✨ Claude द्वारा AI", "yourChildren": "आपके बच्चे",
+    "aiByClaude": "✨ AI-संचालित सारांश", "yourChildren": "आपके बच्चे",
     "schoolNotSet": "स्कूल सेट नहीं"
   },
   "driver": {

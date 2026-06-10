@@ -92,7 +92,7 @@ export default function AdminAccount() {
         api.get<any>("/admin/revenue"),
       ]);
       Alert.alert(
-        "GDPR Compliance Export",
+        "Compliance Export Ready",
         `Users: ${users.length}\nAlerts: ${alerts.length}\nIncidents: ${incidents.length}\nRevenue: £${revenue.total?.toFixed(2) || "0.00"}\n\nFull export saved to admin dashboard.`,
       );
     } catch (e: any) {
@@ -137,22 +137,22 @@ export default function AdminAccount() {
         />
         <Menu
           icon="shield-checkmark"
-          label="Compliance & GDPR"
+          label="Privacy & Safeguarding"
           testID="a-menu-compliance"
           onPress={() =>
             setInfoSheet({
               icon: "shield-checkmark",
               iconColor: COLORS.success,
-              title: "Compliance & GDPR",
-              subtitle: "Stay audit-ready",
+              title: "Privacy & Safeguarding",
+              subtitle: "How we keep families safe",
               bullets: [
-                { icon: "checkmark-circle", title: "GDPR compliant", body: "Right to access, rectify, port and erase — all supported in-app." },
-                { icon: "lock-closed", title: "Encryption", body: "TLS 1.3 in transit. AES-256 at rest." },
-                { icon: "people", title: "DBS-checked drivers", body: "Enhanced background checks every 12 months." },
-                { icon: "document-text", title: "Data retention", body: "Trip data retained for 12 months, then anonymised." },
-                { icon: "download", title: "Audit export", body: "Export full compliance report any time." },
+                { icon: "checkmark-circle", title: "Your data, your control", body: "Access, edit, export or delete your data — any time, right from the app." },
+                { icon: "lock-closed", title: "Encrypted end-to-end", body: "All data is encrypted in transit and at rest." },
+                { icon: "people", title: "Verified drivers only", body: "Every driver passes enhanced background checks every 12 months." },
+                { icon: "document-text", title: "How long we keep data", body: "Trip data is kept for 12 months, then automatically anonymised." },
+                { icon: "download", title: "Export at any time", body: "Download a full report of your school's data whenever you need it." },
               ],
-              primaryLabel: "Export compliance data",
+              primaryLabel: "Download compliance data",
               onPrimary: exportAllData,
             })
           }
@@ -166,20 +166,20 @@ export default function AdminAccount() {
         />
         <Menu
           icon="cog"
-          label="System Settings"
+          label="About this app"
           testID="a-menu-system"
           onPress={() =>
             setInfoSheet({
               icon: "cog",
               iconColor: COLORS.primary,
-              title: "System Settings",
-              subtitle: "Platform configuration",
+              title: "About this app",
+              subtitle: "What powers TripZen",
               bullets: [
-                { icon: "server", title: "Backend", body: "FastAPI + MongoDB on the Emergent cloud." },
-                { icon: "card", title: "Payments", body: "Stripe (set STRIPE_SECRET_KEY for live)." },
-                { icon: "logo-whatsapp", title: "WhatsApp", body: "Twilio (set TWILIO_* env to enable)." },
-                { icon: "sparkles", title: "AI Engine", body: "Claude Sonnet 4.5 via Emergent LLM." },
-                { icon: "code-slash", title: "Version", body: "TripZen v1.0.0 (June 2025)" },
+                { icon: "cloud", title: "Securely hosted", body: "All your data is stored safely on the cloud and protected at every step." },
+                { icon: "card", title: "Safe payments", body: "Card payments are handled by Stripe — your card details never touch our servers." },
+                { icon: "logo-whatsapp", title: "WhatsApp updates", body: "Get pickup and drop-off alerts on WhatsApp (where available)." },
+                { icon: "sparkles", title: "Smart insights", body: "We use AI to summarise your child's week and surface anything that needs attention." },
+                { icon: "code-slash", title: "Version", body: "TripZen — 1.0.1 (June 2025)" },
               ],
             })
           }
@@ -216,11 +216,11 @@ export default function AdminAccount() {
               icon: "information-circle",
               iconColor: COLORS.primary,
               title: "About TripZen",
-              subtitle: "Version 1.0.0",
+              subtitle: "Version 1.0.1",
               body: "Enterprise-grade child transport safety platform.",
               bullets: [
-                { icon: "people", title: "100+ schools served", body: "Across the UK." },
-                { icon: "shield-checkmark", title: "Zero incidents", body: "Since launch." },
+                { icon: "people", title: "Trusted by schools", body: "Serving schools across the UK." },
+                { icon: "shield-checkmark", title: "Safety first", body: "Every trip backed by real-time monitoring." },
                 { icon: "heart", title: "Made with love", body: "© 2025 TripZen Ltd." },
               ],
             })
@@ -251,7 +251,7 @@ export default function AdminAccount() {
           <Text style={styles.signoutText}>Sign out</Text>
         </TouchableOpacity>
 
-        <Text style={styles.footer}>TripZen Admin v1.0</Text>
+        <Text style={styles.footer}>TripZen Admin 1.0.1</Text>
       </ScrollView>
 
       <NotificationPrefsSheet visible={prefsOpen} onClose={() => setPrefsOpen(false)} />

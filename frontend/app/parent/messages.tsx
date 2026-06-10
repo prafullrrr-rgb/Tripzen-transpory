@@ -72,7 +72,7 @@ export default function ParentMessages() {
     <SafeAreaView style={styles.safe} edges={["top"]} testID="parent-messages-screen">
       <View style={styles.header}>
         <Text style={styles.title}>Messages</Text>
-        <Text style={styles.subtitle}>Live alerts about your child's trip</Text>
+        <Text style={styles.subtitle}>Live alerts about your child&apos;s trip</Text>
       </View>
       <ScrollView
         contentContainerStyle={{ paddingHorizontal: SPACING.lg, paddingBottom: 24 }}
@@ -84,7 +84,7 @@ export default function ParentMessages() {
           <View style={styles.empty}>
             <Ionicons name="notifications-off" size={40} color={COLORS.textSecondary} />
             <Text style={styles.emptyText}>No messages yet</Text>
-            <Text style={styles.emptySub}>You'll see boarding & arrival alerts here</Text>
+            <Text style={styles.emptySub}>You&apos;ll see boarding & arrival alerts here</Text>
           </View>
         ) : (
           notifications.map((n) => {

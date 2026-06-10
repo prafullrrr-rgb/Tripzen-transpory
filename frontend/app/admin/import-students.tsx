@@ -99,7 +99,7 @@ export default function ImportStudents() {
               First row must be header: <Text style={styles.code}>name,grade,school</Text>
             </Text>
             <Text style={styles.formatText}>
-              Each next row = one student. "grade" and "school" are optional.
+              Each next row = one student. The grade and school fields are optional.
             </Text>
           </View>
 

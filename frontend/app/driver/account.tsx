@@ -189,7 +189,7 @@ export default function DriverAccount() {
               icon: "information-circle",
               iconColor: COLORS.primary,
               title: "About TripZen",
-              subtitle: "Version 1.0.0",
+              subtitle: "Version 1.0.1",
               body:
                 "Thank you for keeping our children safe. Your work matters.",
               bullets: [

@@ -174,16 +174,16 @@ export default function ParentAccount() {
               title: "Privacy & Security",
               subtitle: "Your data is protected",
               bullets: [
-                { icon: "lock-closed", title: "End-to-end encryption", body: "All trip data is encrypted in transit (TLS 1.3) and at rest." },
+                { icon: "lock-closed", title: "Encrypted end-to-end", body: "All your information is encrypted as it travels and while it's stored." },
                 { icon: "eye-off", title: "No third-party tracking", body: "We never sell your data or your child's location to advertisers." },
-                { icon: "people", title: "Verified drivers only", body: "Every driver is DBS-checked, trained and continuously monitored." },
-                { icon: "trash", title: "Right to be forgotten", body: "Delete your account anytime — see GDPR options below." },
+                { icon: "people", title: "Verified drivers only", body: "Every driver passes enhanced background checks and is regularly monitored." },
+                { icon: "trash", title: "Delete anytime", body: "You can permanently delete your account from this screen — see below." },
               ],
             })
           }
         />
 
-        <Text style={styles.sectionTitle}>Privacy & Data</Text>
+        <Text style={styles.sectionTitle}>Your Data</Text>
         <MenuItem
           icon="download"
           label={t("settings.gdprExport")}
@@ -192,7 +192,7 @@ export default function ParentAccount() {
             try {
               const data = await api.get<any>("/parent/gdpr-export");
               const summary = `Export ready!\n\nChildren: ${data.children.length}\nBookings: ${data.bookings.length}\nNotifications: ${data.notifications.length}\nMessages: ${data.messages.length}\nRatings: ${data.ratings.length}\n\nExported: ${new Date(data.exported_at).toLocaleString()}`;
-              Alert.alert("GDPR Export", summary);
+              Alert.alert("Your Data Export", summary);
             } catch (e: any) {
               Alert.alert("Failed", e.message);
             }
@@ -242,13 +242,13 @@ export default function ParentAccount() {
               icon: "information-circle",
               iconColor: COLORS.primary,
               title: "About TripZen",
-              subtitle: "Version 1.0.0",
+              subtitle: "Version 1.0.1",
               body:
                 "TripZen is the safest way to send your child to school. Built with safety, transparency and trust at its core.",
               bullets: [
-                { icon: "people", title: "DBS-verified drivers", body: "Every driver passes enhanced background checks." },
+                { icon: "people", title: "Verified drivers", body: "Every driver passes enhanced background checks." },
                 { icon: "navigate", title: "Real-time tracking", body: "Always know where your child is." },
-                { icon: "sparkles", title: "AI-powered insights", body: "Weekly summaries by Claude." },
+                { icon: "sparkles", title: "Smart weekly summaries", body: "AI-powered insights so you stay one step ahead." },
                 { icon: "heart", title: "Made with love", body: "© 2025 TripZen Ltd. UK." },
               ],
             })
@@ -265,7 +265,7 @@ export default function ParentAccount() {
           <Text style={styles.signoutText}>{t("auth.signOut")}</Text>
         </TouchableOpacity>
 
-        <Text style={styles.brandFooter}>TripZen v1.0 • Safe today. Stronger tomorrow.</Text>
+        <Text style={styles.brandFooter}>TripZen 1.0.1 • Safe today. Stronger tomorrow.</Text>
       </ScrollView>
 
       {/* Language picker modal */}

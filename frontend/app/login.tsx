@@ -117,28 +117,30 @@ export default function Login() {
             </TouchableOpacity>
           </View>
 
-          {/* Demo accounts */}
-          <View style={styles.demoSection}>
-            <Text style={styles.demoTitle}>Try a demo account</Text>
-            {DEMO_ACCOUNTS.map((acc) => (
-              <TouchableOpacity
-                key={acc.role}
-                testID={`demo-${acc.role.toLowerCase()}-btn`}
-                style={styles.demoCard}
-                onPress={() => fillDemo(acc)}
-                activeOpacity={0.7}
-              >
-                <View style={styles.demoIcon}>
-                  <Ionicons name={acc.icon as any} size={20} color={COLORS.primary} />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.demoRole}>{acc.role}</Text>
-                  <Text style={styles.demoEmail}>{acc.email}</Text>
-                </View>
-                <Ionicons name="arrow-forward" size={18} color={COLORS.textSecondary} />
-              </TouchableOpacity>
-            ))}
-          </View>
+          {/* Demo accounts — only visible in dev / non-production builds */}
+          {__DEV__ && (
+            <View style={styles.demoSection}>
+              <Text style={styles.demoTitle}>Try a demo account</Text>
+              {DEMO_ACCOUNTS.map((acc) => (
+                <TouchableOpacity
+                  key={acc.role}
+                  testID={`demo-${acc.role.toLowerCase()}-btn`}
+                  style={styles.demoCard}
+                  onPress={() => fillDemo(acc)}
+                  activeOpacity={0.7}
+                >
+                  <View style={styles.demoIcon}>
+                    <Ionicons name={acc.icon as any} size={20} color={COLORS.primary} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.demoRole}>{acc.role}</Text>
+                    <Text style={styles.demoEmail}>{acc.email}</Text>
+                  </View>
+                  <Ionicons name="arrow-forward" size={18} color={COLORS.textSecondary} />
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>

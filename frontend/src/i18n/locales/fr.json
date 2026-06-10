@@ -29,7 +29,7 @@
     "onTheWay": "En route", "liveTracking": "Suivi en direct",
     "bookTrip": "Réserver", "chatDriver": "Discuter",
     "history": "Historique", "weeklySummary": "Cette semaine avec {{name}}",
-    "aiByClaude": "✨ IA générée par Claude", "yourChildren": "Vos enfants",
+    "aiByClaude": "✨ Résumé généré par IA", "yourChildren": "Vos enfants",
     "schoolNotSet": "École non définie"
   },
   "driver": {
