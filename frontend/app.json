@@ -11,7 +11,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.tripzen.app",
-      "buildNumber": "2",
+      "buildNumber": "3",
       "infoPlist": {
         "NSCameraUsageDescription": "Scan student QR badges for safe boarding.",
         "NSLocationWhenInUseUsageDescription": "Track the bus route in real-time.",
@@ -29,7 +29,7 @@
     },
     "android": {
       "package": "com.tripzen.app",
-      "versionCode": 2,
+      "versionCode": 3,
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#000000"
